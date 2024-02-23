@@ -48,6 +48,19 @@ target("hgexhelpers")
     add_headerfiles("include/hge*.h")
     add_files("src/helpers/*.cpp")
 
+target("particleed")
+    set_kind("binary")
+
+    add_rules("win.sdk.application")
+    add_deps("hgex", "hgexhelpers")
+
+    add_files("src/particleed/*.cpp")
+
+    after_build(function(target)
+        os.cp(path.join(target:targetdir(), "hgex.dll"), "tools/particleed")
+        os.cp(path.join(target:targetdir(), "particleed.exe"), "tools/particleed")
+    end)
+
 rule("tutorial_base")
     add_deps("win.sdk.application")
 
