@@ -78,6 +78,53 @@ target("fonted")
         os.cp(path.join(target:targetdir(), "fonted.exe"), "tools/fonted")
     end)
 
+target("fontconv")
+    set_kind("binary")
+    set_rundir("$(projectdir)/tools/fonted")
+
+    add_deps("hgex", "hgexhelpers")
+
+    add_files("src/fontconv/*.cpp")
+    
+    after_build(function(target)
+        os.cp(path.join(target:targetdir(), "hgex.dll"), "tools/fonted")
+        os.cp(path.join(target:targetdir(), "fontconv.exe"), "tools/fonted")
+    end)
+
+target("pngopt")
+    set_kind("binary")
+    set_rundir("$(projectdir)/tools/fonted")
+
+    add_deps("hgex", "hgexhelpers")
+
+    add_files("src/pngopt/*.cpp")
+
+    add_files("src/pngopt/ZLIB/*.c")
+    add_files("src/pngopt/libPNG/*.c")
+    
+    after_build(function(target)
+        os.mkdir("tools/texasm")
+        os.cp(path.join(target:targetdir(), "hgex.dll"), "tools/texasm")
+        os.cp(path.join(target:targetdir(), "pngopt.exe"), "tools/texasm")
+    end)
+
+target("texasm")
+    set_kind("binary")
+    set_rundir("$(projectdir)/tools/fonted")
+
+    add_deps("hgex", "hgexhelpers")
+
+    add_files("src/texasm/*.cpp")
+
+    add_files("src/texasm/ZLIB/*.c")
+    add_files("src/texasm/libPNG/*.c")
+    
+    after_build(function(target)
+        os.mkdir("tools/texasm")
+        os.cp(path.join(target:targetdir(), "hgex.dll"), "tools/texasm")
+        os.cp(path.join(target:targetdir(), "texasm.exe"), "tools/texasm")
+    end)
+
 rule("tutorial_base")
     add_deps("win.sdk.application")
 
