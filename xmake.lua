@@ -10,7 +10,6 @@ target("bass")
     add_headerfiles("deps/bass/include/*.h")
 
     after_build("windows", function(target)
-        print("bassinstall")
         os.cp("deps/bass/bin/bass.dll", target:targetdir())
     end)
 
@@ -50,6 +49,7 @@ target("hgexhelpers")
 
 target("particleed")
     set_kind("binary")
+    set_rundir("$(projectdir)/tools/particleed")
 
     add_rules("win.sdk.application")
     add_deps("hgex", "hgexhelpers")
@@ -59,6 +59,23 @@ target("particleed")
     after_build(function(target)
         os.cp(path.join(target:targetdir(), "hgex.dll"), "tools/particleed")
         os.cp(path.join(target:targetdir(), "particleed.exe"), "tools/particleed")
+    end)
+
+target("fonted")
+    set_kind("binary")
+    set_rundir("$(projectdir)/tools/fonted")
+
+    add_rules("win.sdk.application")
+    add_deps("hgex", "hgexhelpers")
+
+    add_files("src/fonted/*.cpp")
+
+    add_files("src/fonted/ZLIB/*.c")
+    add_files("src/fonted/libPNG/*.c")
+    
+    after_build(function(target)
+        os.cp(path.join(target:targetdir(), "hgex.dll"), "tools/fonted")
+        os.cp(path.join(target:targetdir(), "fonted.exe"), "tools/fonted")
     end)
 
 rule("tutorial_base")
