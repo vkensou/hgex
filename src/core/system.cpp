@@ -8,6 +8,7 @@
 
 
 #include "hge_impl.h"
+#include <direct.h>
 
 
 #define LOWORDINT(n) ((int)((signed short)(LOWORD(n))))
@@ -716,10 +717,10 @@ HGE_Impl::HGE_Impl()
 #endif
 
 
-	GetModuleFileName(GetModuleHandle(NULL), szAppPath, sizeof(szAppPath));
-	int i;
-	for(i=strlen(szAppPath)-1; i>0; i--) if(szAppPath[i]=='\\') break;
-	szAppPath[i+1]=0;
+	getcwd(szAppPath, sizeof(szAppPath));
+	int len = strlen(szAppPath);
+	if (szAppPath[len-1] != '/' && szAppPath[len-1] != '\\')
+		strcat(szAppPath, "/");
 }
 
 void HGE_Impl::_PostError(char *error)
