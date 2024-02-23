@@ -12,15 +12,18 @@ target("hgex")
         add_syslinks("user32", "shell32", "gdi32", "winmm")
     end
 
-    add_includedirs("deps/dx9sdkmini/include", {public = false})
-    add_headerfiles("deps/dx9sdkmini/include/*.h")
-
     if (is_os("windows")) then
+        add_includedirs("deps/dx9sdkmini/include", {public = false})
+        add_headerfiles("deps/dx9sdkmini/include/*.h")
+
         if (is_arch("x86")) then
             add_linkdirs("deps/dx9sdkmini/lib/x86")
             add_links("d3d9.lib", "d3dx9.lib")
         end
     end
+
+    add_includedirs("deps/bass/include", {public = false})
+    add_headerfiles("deps/bass/include/*.h")
 
     add_includedirs("include", {public = true})
     add_headerfiles("include/hge.h")
