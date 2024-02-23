@@ -12,8 +12,8 @@
 
 #include "..\..\include\hge.h"
 #include <stdio.h>
-#include <d3d8.h>
-#include <d3dx8.h>
+#include <d3d9.h>
+#include <d3dx9.h>
 
 #define DEMO
 
@@ -28,8 +28,8 @@ struct CRenderTargetList
 {
 	int					width;
 	int					height;
-	IDirect3DTexture8*	pTex;
-	IDirect3DSurface8*	pDepth;
+	IDirect3DTexture9*	pTex;
+	IDirect3DSurface9*	pDepth;
 	CRenderTargetList*	next;
 };
 
@@ -259,13 +259,13 @@ public:
 	RECT					rectFS;
 	LONG					styleFS;
 
-	IDirect3D8*				pD3D;
-	IDirect3DDevice8*		pD3DDevice;
-	IDirect3DVertexBuffer8*	pVB;
-	IDirect3DIndexBuffer8*	pIB;
+	IDirect3D9*				pD3D;
+	IDirect3DDevice9*		pD3DDevice;
+	IDirect3DVertexBuffer9*	pVB;
+	IDirect3DIndexBuffer9*	pIB;
 
-	IDirect3DSurface8*	pScreenSurf;
-	IDirect3DSurface8*	pScreenDepth;
+	IDirect3DSurface9*	pScreenSurf;
+	IDirect3DSurface9*	pScreenDepth;
 	CRenderTargetList*	pTargets;
 	CRenderTargetList*	pCurTarget;
 

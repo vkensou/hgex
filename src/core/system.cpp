@@ -379,13 +379,13 @@ void CALL HGE_Impl::System_SetStateBool(hgeBoolState state, bool value)
 									_render_batch();
 									if(bTextureFilter)
 									{
-										pD3DDevice->SetTextureStageState(0,D3DTSS_MAGFILTER,D3DTEXF_LINEAR);
-										pD3DDevice->SetTextureStageState(0,D3DTSS_MINFILTER,D3DTEXF_LINEAR);
+										pD3DDevice->SetSamplerState(0,D3DSAMP_MAGFILTER,D3DTEXF_LINEAR);
+										pD3DDevice->SetSamplerState(0,D3DSAMP_MINFILTER,D3DTEXF_LINEAR);
 									}
 									else
 									{
-										pD3DDevice->SetTextureStageState(0,D3DTSS_MAGFILTER,D3DTEXF_POINT);
-										pD3DDevice->SetTextureStageState(0,D3DTSS_MINFILTER,D3DTEXF_POINT);
+										pD3DDevice->SetSamplerState(0,D3DSAMP_MAGFILTER,D3DTEXF_POINT);
+										pD3DDevice->SetSamplerState(0,D3DSAMP_MINFILTER,D3DTEXF_POINT);
 									}
 								}
 								break;
@@ -462,13 +462,13 @@ void CALL HGE_Impl::System_SetStateInt(hgeIntState state, int value)
 									{
 										if(value==HGEFPS_VSYNC)
 										{
-											d3dppW.SwapEffect = D3DSWAPEFFECT_COPY_VSYNC;
-											d3dppFS.FullScreen_PresentationInterval = D3DPRESENT_INTERVAL_ONE;
+											d3dppW.SwapEffect = D3DSWAPEFFECT_COPY;
+											d3dppFS.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
 										}
 										else
 										{
 											d3dppW.SwapEffect = D3DSWAPEFFECT_COPY;
-											d3dppFS.FullScreen_PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
+											d3dppFS.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
 										}
 										//if(procFocusLostFunc) procFocusLostFunc();
 										_GfxRestore();
@@ -616,7 +616,7 @@ bool CALL HGE_Impl::System_Launch(const char *url)
 
 void CALL HGE_Impl::System_Snapshot(const char *filename)
 {
-	LPDIRECT3DSURFACE8 pSurf;
+	LPDIRECT3DSURFACE9 pSurf;
 	char *shotname, tempname[_MAX_PATH];
 	int i;
 
@@ -635,7 +635,7 @@ void CALL HGE_Impl::System_Snapshot(const char *filename)
 
 	if(pD3DDevice)
 	{
-		pD3DDevice->GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &pSurf);
+		pD3DDevice->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &pSurf);
 		D3DXSaveSurfaceToFile(filename, D3DXIFF_BMP, pSurf, NULL, NULL);
 		pSurf->Release();
 	}
@@ -863,3 +863,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
+void HGE_Impl::_InitPowerStatus()
+{
+}
+
+void HGE_Impl::_UpdatePowerStatus()
+{
+}
+
+void HGE_Impl::_DonePowerStatus()
+{
+}

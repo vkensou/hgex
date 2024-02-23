@@ -8,8 +8,8 @@
 
 
 #include "hge_impl.h"
-#include <d3d8.h>
-#include <d3dx8.h>
+#include <d3d9.h>
+#include <d3dx9.h>
 
 
 void CALL HGE_Impl::Gfx_Clear(DWORD color)
@@ -32,7 +32,7 @@ void CALL HGE_Impl::Gfx_Clear(DWORD color)
 
 void CALL HGE_Impl::Gfx_SetClipping(int x, int y, int w, int h)
 {
-	D3DVIEWPORT8 vp;
+	D3DVIEWPORT9 vp;
 	int scr_width, scr_height;
 
 	if(!pCurTarget) {
@@ -101,7 +101,7 @@ void CALL HGE_Impl::Gfx_SetTransform(float x, float y, float dx, float dy, float
 
 bool CALL HGE_Impl::Gfx_BeginScene(HTARGET targ)
 {
-	LPDIRECT3DSURFACE8 pSurf=0, pDepth=0;
+	LPDIRECT3DSURFACE9 pSurf=0, pDepth=0;
 	D3DDISPLAYMODE Mode;
 	CRenderTargetList *target=(CRenderTargetList *)targ;
 
@@ -143,7 +143,7 @@ bool CALL HGE_Impl::Gfx_BeginScene(HTARGET targ)
 			pSurf=pScreenSurf;
 			pDepth=pScreenDepth;
 		}
-		if(FAILED(pD3DDevice->SetRenderTarget(pSurf, pDepth)))
+		if(FAILED(pD3DDevice->SetRenderTarget( 0, pSurf)))
 		{
 			if(target) pSurf->Release();
 			_PostError("Gfx_BeginScene: Can't set render target");
@@ -171,7 +171,7 @@ bool CALL HGE_Impl::Gfx_BeginScene(HTARGET targ)
 	}
 
 	pD3DDevice->BeginScene();
-	pVB->Lock( 0, 0, (BYTE**)&VertArray, 0 );
+	pVB->Lock( 0, 0, (void**)&VertArray, 0 );
 
 	return true;
 }
@@ -219,7 +219,7 @@ void CALL HGE_Impl::Gfx_RenderTriple(const hgeTriple *triple)
 			CurPrimType=HGEPRIM_TRIPLES;
 			if(CurBlendMode != triple->blend) _SetBlendMode(triple->blend);
 			if(triple->tex != CurTexture) {
-				pD3DDevice->SetTexture( 0, (LPDIRECT3DTEXTURE8)triple->tex );
+				pD3DDevice->SetTexture( 0, (LPDIRECT3DTEXTURE9)triple->tex );
 				CurTexture = triple->tex;
 			}
 		}
@@ -241,7 +241,7 @@ void CALL HGE_Impl::Gfx_RenderQuad(const hgeQuad *quad)
 			if(CurBlendMode != quad->blend) _SetBlendMode(quad->blend);
 			if(quad->tex != CurTexture)
 			{
-				pD3DDevice->SetTexture( 0, (LPDIRECT3DTEXTURE8)quad->tex );
+				pD3DDevice->SetTexture( 0, (LPDIRECT3DTEXTURE9)quad->tex );
 				CurTexture = quad->tex;
 			}
 		}
@@ -261,7 +261,7 @@ hgeVertex* CALL HGE_Impl::Gfx_StartBatch(int prim_type, HTEXTURE tex, int blend,
 		if(CurBlendMode != blend) _SetBlendMode(blend);
 		if(tex != CurTexture)
 		{
-			pD3DDevice->SetTexture( 0, (LPDIRECT3DTEXTURE8)tex );
+			pD3DDevice->SetTexture( 0, (LPDIRECT3DTEXTURE9)tex );
 			CurTexture = tex;
 		}
 
@@ -300,7 +300,7 @@ HTARGET CALL HGE_Impl::Target_Create(int width, int height, bool zbuffer)
 	if(zbuffer)
 	{
 		if(FAILED(pD3DDevice->CreateDepthStencilSurface(pTarget->width, pTarget->height,
-						D3DFMT_D16, D3DMULTISAMPLE_NONE, &pTarget->pDepth)))
+						D3DFMT_D16, D3DMULTISAMPLE_NONE, 0, FALSE, &pTarget->pDepth, NULL )))
 		{   
 			pTarget->pTex->Release();
 			_PostError("Can't create render target depth buffer");
@@ -349,7 +349,7 @@ HTEXTURE CALL HGE_Impl::Target_GetTexture(HTARGET target)
 
 HTEXTURE CALL HGE_Impl::Texture_Create(int width, int height)
 {
-	LPDIRECT3DTEXTURE8 pTex;
+	LPDIRECT3DTEXTURE9 pTex;
 
 	if( FAILED( D3DXCreateTexture( pD3DDevice, width, height,
 										1,					// Mip levels
@@ -370,7 +370,7 @@ HTEXTURE CALL HGE_Impl::Texture_Load(const char *filename, DWORD size, bool bMip
 	void *data;
 	DWORD _size;
 	D3DFORMAT fmt1, fmt2;
-	LPDIRECT3DTEXTURE8 pTex;
+	LPDIRECT3DTEXTURE9 pTex;
 	D3DXIMAGE_INFO info;
 	CTextureList *texItem;
 
@@ -437,7 +437,7 @@ HTEXTURE CALL HGE_Impl::Texture_Load(const char *filename, DWORD size, bool bMip
 
 void CALL HGE_Impl::Texture_Free(HTEXTURE tex)
 {
-	LPDIRECT3DTEXTURE8 pTex=(LPDIRECT3DTEXTURE8)tex;
+	LPDIRECT3DTEXTURE9 pTex=(LPDIRECT3DTEXTURE9)tex;
 	CTextureList *texItem=textures, *texPrev=0;
 
 	while(texItem)
@@ -458,7 +458,7 @@ void CALL HGE_Impl::Texture_Free(HTEXTURE tex)
 int CALL HGE_Impl::Texture_GetWidth(HTEXTURE tex, bool bOriginal)
 {
 	D3DSURFACE_DESC TDesc;
-	LPDIRECT3DTEXTURE8 pTex=(LPDIRECT3DTEXTURE8)tex;
+	LPDIRECT3DTEXTURE9 pTex=(LPDIRECT3DTEXTURE9)tex;
 	CTextureList *texItem=textures;
 
 	if(bOriginal)
@@ -481,7 +481,7 @@ int CALL HGE_Impl::Texture_GetWidth(HTEXTURE tex, bool bOriginal)
 int CALL HGE_Impl::Texture_GetHeight(HTEXTURE tex, bool bOriginal)
 {
 	D3DSURFACE_DESC TDesc;
-	LPDIRECT3DTEXTURE8 pTex=(LPDIRECT3DTEXTURE8)tex;
+	LPDIRECT3DTEXTURE9 pTex=(LPDIRECT3DTEXTURE9)tex;
 	CTextureList *texItem=textures;
 
 	if(bOriginal)
@@ -503,7 +503,7 @@ int CALL HGE_Impl::Texture_GetHeight(HTEXTURE tex, bool bOriginal)
 
 DWORD * CALL HGE_Impl::Texture_Lock(HTEXTURE tex, bool bReadOnly, int left, int top, int width, int height)
 {
-	LPDIRECT3DTEXTURE8 pTex=(LPDIRECT3DTEXTURE8)tex;
+	LPDIRECT3DTEXTURE9 pTex=(LPDIRECT3DTEXTURE9)tex;
 	D3DSURFACE_DESC TDesc;
 	D3DLOCKED_RECT TRect;
 	RECT region, *prec;
@@ -537,7 +537,7 @@ DWORD * CALL HGE_Impl::Texture_Lock(HTEXTURE tex, bool bReadOnly, int left, int 
 
 void CALL HGE_Impl::Texture_Unlock(HTEXTURE tex)
 {
-	LPDIRECT3DTEXTURE8 pTex=(LPDIRECT3DTEXTURE8)tex;
+	LPDIRECT3DTEXTURE9 pTex=(LPDIRECT3DTEXTURE9)tex;
 	pTex->UnlockRect(0);
 }
 
@@ -554,7 +554,7 @@ void HGE_Impl::_render_batch(bool bEndScene)
 			switch(CurPrimType)
 			{
 				case HGEPRIM_QUADS:
-					pD3DDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, nPrim<<2, 0, nPrim<<1);
+					pD3DDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, nPrim<<2, 0, nPrim<<1);
 					break;
 
 				case HGEPRIM_TRIPLES:
@@ -570,7 +570,7 @@ void HGE_Impl::_render_batch(bool bEndScene)
 		}
 
 		if(bEndScene) VertArray = 0;
-		else pVB->Lock( 0, 0, (BYTE**)&VertArray, 0 );
+		pVB->Lock( 0, 0, (void**)&VertArray, 0 );
 	}
 }
 
@@ -610,14 +610,14 @@ void HGE_Impl::_SetProjectionMatrix(int width, int height)
 bool HGE_Impl::_GfxInit()
 {
 	static const char *szFormats[]={"UNKNOWN", "R5G6B5", "X1R5G5B5", "A1R5G5B5", "X8R8G8B8", "A8R8G8B8"};
-	D3DADAPTER_IDENTIFIER8 AdID;
+	D3DADAPTER_IDENTIFIER9 AdID;
 	D3DDISPLAYMODE Mode;
 	D3DFORMAT Format=D3DFMT_UNKNOWN;
 	UINT nModes, i;
 	
 // Init D3D
 							
-	pD3D=Direct3DCreate8(120); // D3D_SDK_VERSION
+	pD3D=Direct3DCreate9(D3D_SDK_VERSION); // 120
 	if(pD3D==NULL)
 	{
 		_PostError("Can't create D3D interface");
@@ -626,7 +626,7 @@ bool HGE_Impl::_GfxInit()
 
 // Get adapter info
 
-	pD3D->GetAdapterIdentifier(D3DADAPTER_DEFAULT, D3DENUM_NO_WHQL_LEVEL, &AdID);
+	pD3D->GetAdapterIdentifier(D3DADAPTER_DEFAULT, D3DENUM_WHQL_LEVEL, &AdID);
 	System_Log("D3D Driver: %s",AdID.Driver);
 	System_Log("Description: %s",AdID.Description);
 	System_Log("Version: %d.%d.%d.%d",
@@ -653,7 +653,7 @@ bool HGE_Impl::_GfxInit()
 	d3dppW.hDeviceWindow    = hwnd;
 	d3dppW.Windowed         = TRUE;
 
-	if(nHGEFPS==HGEFPS_VSYNC) d3dppW.SwapEffect = D3DSWAPEFFECT_COPY_VSYNC;
+	if(nHGEFPS==HGEFPS_VSYNC) d3dppW.SwapEffect = D3DSWAPEFFECT_COPY;
 	else					  d3dppW.SwapEffect = D3DSWAPEFFECT_COPY;
 
 	if(bZBuffer)
@@ -664,11 +664,11 @@ bool HGE_Impl::_GfxInit()
 
 // Set up Full Screen presentation parameters
 
-	nModes=pD3D->GetAdapterModeCount(D3DADAPTER_DEFAULT);
+	nModes=pD3D->GetAdapterModeCount(D3DADAPTER_DEFAULT, D3DFMT_X8R8G8B8);
 
 	for(i=0; i<nModes; i++)
 	{
-		pD3D->EnumAdapterModes(D3DADAPTER_DEFAULT, i, &Mode);
+		pD3D->EnumAdapterModes(D3DADAPTER_DEFAULT, D3DFMT_X8R8G8B8, i, &Mode);
 		if(Mode.Width != (UINT)nScreenWidth || Mode.Height != (UINT)nScreenHeight) continue;
 		if(nScreenBPP==16 && (_format_id(Mode.Format) > _format_id(D3DFMT_A1R5G5B5))) continue;
 		if(_format_id(Mode.Format) > _format_id(Format)) Format=Mode.Format;
@@ -693,8 +693,8 @@ bool HGE_Impl::_GfxInit()
 	d3dppFS.SwapEffect       = D3DSWAPEFFECT_FLIP;
 	d3dppFS.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
 
-	if(nHGEFPS==HGEFPS_VSYNC) d3dppFS.FullScreen_PresentationInterval = D3DPRESENT_INTERVAL_ONE;
-	else					  d3dppFS.FullScreen_PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
+	if(nHGEFPS==HGEFPS_VSYNC) d3dppFS.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
+	else					  d3dppFS.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
 
 	if(bZBuffer)
 	{
@@ -811,14 +811,14 @@ void HGE_Impl::_GfxDone()
 
 	if(pIB)
 	{
-		pD3DDevice->SetIndices(NULL,0);
+		pD3DDevice->SetIndices(NULL);
 		pIB->Release();
 		pIB=0;
 	}
 	if(pVB)
 	{
 		if(VertArray) {	pVB->Unlock(); VertArray=0;	}
-		pD3DDevice->SetStreamSource( 0, NULL, sizeof(hgeVertex) );
+		pD3DDevice->SetStreamSource( 0, NULL, 0, sizeof(hgeVertex) );
 		pVB->Release();
 		pVB=0;
 	}
@@ -846,12 +846,12 @@ bool HGE_Impl::_GfxRestore()
 
 	if(pIB)
 	{
-		pD3DDevice->SetIndices(NULL,0);
+		pD3DDevice->SetIndices(NULL);
 		pIB->Release();
 	}
 	if(pVB)
 	{
-		pD3DDevice->SetStreamSource( 0, NULL, sizeof(hgeVertex) );
+		pD3DDevice->SetStreamSource( 0, NULL, 0, sizeof(hgeVertex) );
 		pVB->Release();
 	}
 
@@ -874,7 +874,7 @@ bool HGE_Impl::_init_lost()
 	pScreenSurf=0;
 	pScreenDepth=0;
 
-	pD3DDevice->GetRenderTarget(&pScreenSurf);
+	pD3DDevice->GetRenderTarget( 0, &pScreenSurf);
 	pD3DDevice->GetDepthStencilSurface(&pScreenDepth);
 	
 	while(target)
@@ -884,7 +884,8 @@ bool HGE_Impl::_init_lost()
 							  d3dpp->BackBufferFormat, D3DPOOL_DEFAULT, &target->pTex);
 		if(target->pDepth)
 			pD3DDevice->CreateDepthStencilSurface(target->width, target->height,
-												  D3DFMT_D16, D3DMULTISAMPLE_NONE, &target->pDepth);
+													D3DFMT_D16, D3DMULTISAMPLE_NONE, 0, FALSE, &target->pDepth, NULL );
+
 		target=target->next;
 	}
 
@@ -893,28 +894,28 @@ bool HGE_Impl::_init_lost()
 	if( FAILED (pD3DDevice->CreateVertexBuffer(VERTEX_BUFFER_SIZE*sizeof(hgeVertex),
                                               D3DUSAGE_WRITEONLY,
 											  D3DFVF_HGEVERTEX,
-                                              D3DPOOL_DEFAULT, &pVB )))
+											  D3DPOOL_DEFAULT, &pVB, NULL )))
 	{
 		_PostError("Can't create D3D vertex buffer");
 		return false;
 	}
 
-	pD3DDevice->SetVertexShader( D3DFVF_HGEVERTEX );
-	pD3DDevice->SetStreamSource( 0, pVB, sizeof(hgeVertex) );
+	pD3DDevice->SetVertexShader( NULL );pD3DDevice->SetFVF(D3DFVF_HGEVERTEX);
+	pD3DDevice->SetStreamSource( 0, pVB, 0, sizeof(hgeVertex) );
 
 // Create and setup Index buffer
 
 	if( FAILED( pD3DDevice->CreateIndexBuffer(VERTEX_BUFFER_SIZE*6/4*sizeof(WORD),
                                               D3DUSAGE_WRITEONLY,
 											  D3DFMT_INDEX16,
-                                              D3DPOOL_DEFAULT, &pIB ) ) )
+											  D3DPOOL_DEFAULT, &pIB, NULL ) ) )
 	{
 		_PostError("Can't create D3D index buffer");
 		return false;
 	}
 
 	WORD *pIndices, n=0;
-	if( FAILED( pIB->Lock( 0, 0, (BYTE**)&pIndices, 0 ) ) )
+	if( FAILED( pIB->Lock( 0, 0, (void**)&pIndices, 0 ) ) )
 	{
 		_PostError("Can't lock D3D index buffer");
 		return false;
@@ -931,7 +932,7 @@ bool HGE_Impl::_init_lost()
 	}
 
 	pIB->Unlock();
-	pD3DDevice->SetIndices(pIB,0);
+	pD3DDevice->SetIndices(pIB);
 
 // Set common render states
 
@@ -955,17 +956,17 @@ bool HGE_Impl::_init_lost()
 	pD3DDevice->SetTextureStageState( 0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE );
 	pD3DDevice->SetTextureStageState( 0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE );
 
-	pD3DDevice->SetTextureStageState(0, D3DTSS_MIPFILTER, D3DTEXF_POINT);
+	pD3DDevice->SetSamplerState(0,D3DSAMP_MIPFILTER,D3DTEXF_POINT);
 
 	if(bTextureFilter)
 	{
-		pD3DDevice->SetTextureStageState(0,D3DTSS_MAGFILTER,D3DTEXF_LINEAR);
-		pD3DDevice->SetTextureStageState(0,D3DTSS_MINFILTER,D3DTEXF_LINEAR);
+		pD3DDevice->SetSamplerState(0,D3DSAMP_MAGFILTER,D3DTEXF_LINEAR);
+		pD3DDevice->SetSamplerState(0,D3DSAMP_MINFILTER,D3DTEXF_LINEAR);
 	}
 	else
 	{
-		pD3DDevice->SetTextureStageState(0,D3DTSS_MAGFILTER,D3DTEXF_POINT);
-		pD3DDevice->SetTextureStageState(0,D3DTSS_MINFILTER,D3DTEXF_POINT);
+		pD3DDevice->SetSamplerState(0,D3DSAMP_MAGFILTER,D3DTEXF_POINT);
+		pD3DDevice->SetSamplerState(0,D3DSAMP_MINFILTER,D3DTEXF_POINT);
 	}
 
 	nPrim=0;
