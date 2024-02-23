@@ -717,10 +717,10 @@ HGE_Impl::HGE_Impl()
 #endif
 
 
-	getcwd(szAppPath, sizeof(szAppPath));
-	int len = strlen(szAppPath);
-	if (szAppPath[len-1] != '/' && szAppPath[len-1] != '\\')
-		strcat(szAppPath, "/");
+	getcwd(szCurPath, sizeof(szCurPath));
+	int len = strlen(szCurPath);
+	if (szCurPath[len-1] != '/' && szCurPath[len-1] != '\\')
+		strcat(szCurPath, "/");
 }
 
 void HGE_Impl::_PostError(char *error)

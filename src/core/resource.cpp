@@ -197,12 +197,12 @@ char* CALL HGE_Impl::Resource_MakePath(const char *filename)
 	int i;
 
 	if(!filename)
-		strcpy(szTmpFilename, szAppPath);
+		strcpy(szTmpFilename, szCurPath);
 	else if(filename[0]=='\\' || filename[0]=='/' || filename[1]==':')
 		strcpy(szTmpFilename, filename);
 	else
 	{
-		strcpy(szTmpFilename, szAppPath);
+		strcpy(szTmpFilename, szCurPath);
 		if(filename) strcat(szTmpFilename, filename);
 	}
 

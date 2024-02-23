@@ -202,7 +202,7 @@ public:
 
 	bool				bActive;
 	char				szError[256];
-	char				szAppPath[_MAX_PATH];
+	char				szCurPath[_MAX_PATH];
 	char				szIniString[256];
 
 
