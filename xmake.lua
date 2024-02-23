@@ -19,7 +19,7 @@ target("hgex")
 
     add_deps("bass")
 
-    add_defines("HGEDLL") 
+    add_defines("HGEDLL")
 
     if (is_os("windows")) then
         add_syslinks("user32", "shell32", "gdi32", "winmm")
@@ -41,11 +41,18 @@ target("hgex")
 
     add_files("src/core/ZLIB/*.c")
 
+target("hgexhelpers")
+    set_kind("static")
+
+    add_includedirs("include", {public = true})
+    add_headerfiles("include/hge*.h")
+    add_files("src/helpers/*.cpp")
+
 rule("tutorial_base")
     add_deps("win.sdk.application")
 
     after_load(function(target)
-        target:add("deps", "hgex")
+        target:add("deps", "hgex", "hgexhelpers")
         target:set("rundir", "$(projectdir)/tutorials/precompiled")
     end)
 
@@ -53,8 +60,13 @@ target("tutorial01")
     add_rules("tutorial_base")
 
     add_files("tutorials/tutorial01/*.cpp")
-    
+
 target("tutorial02")
     add_rules("tutorial_base")
 
     add_files("tutorials/tutorial02/*.cpp")
+
+target("tutorial03")
+    add_rules("tutorial_base")
+
+    add_files("tutorials/tutorial03/*.cpp")
