@@ -863,14 +863,3 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
-void HGE_Impl::_InitPowerStatus()
-{
-}
-
-void HGE_Impl::_UpdatePowerStatus()
-{
-}
-
-void HGE_Impl::_DonePowerStatus()
-{
-}
