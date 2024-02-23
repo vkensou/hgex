@@ -70,3 +70,28 @@ target("tutorial03")
     add_rules("tutorial_base")
 
     add_files("tutorials/tutorial03/*.cpp")
+
+target("tutorial04")
+    add_rules("tutorial_base")
+
+    add_files("tutorials/tutorial04/*.cpp")
+
+target("tutorial05")
+    add_rules("tutorial_base")
+
+    add_files("tutorials/tutorial05/*.cpp")
+
+target("tutorial06")
+    add_rules("tutorial_base")
+
+    add_files("tutorials/tutorial06/*.cpp")
+
+target("tutorial07")
+    add_rules("tutorial_base")
+
+    add_files("tutorials/tutorial07/*.cpp")
+
+target("tutorial08")
+    add_rules("tutorial_base")
+
+    add_files("tutorials/tutorial08/*.cpp")
