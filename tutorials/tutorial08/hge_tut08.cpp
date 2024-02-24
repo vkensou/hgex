@@ -250,7 +250,7 @@ bool InitSimulation()
 		starS[i]=hge->Random_Float(0.1f, 0.7f);
 	}
 
-	for(i=0;i<SEA_SUBDIVISION;i++) // sea waves phase shifts
+	for(int i=0;i<SEA_SUBDIVISION;i++) // sea waves phase shifts
 	{
 		seaP[i]=i+hge->Random_Float(-15.0f, 15.0f);
 	}
