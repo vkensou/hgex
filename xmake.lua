@@ -13,7 +13,7 @@ target("bass")
 
     after_build("windows", function(target)
         if (is_arch("x86")) then
-            os.cp("deps/bass/bin/bass.dll", target:targetdir())
+            os.cp("deps/bass/bin/x86/bass.dll", target:targetdir())
         end
     end)
 
