@@ -12,6 +12,7 @@
 
 
 #include <windows.h>
+#include <stdint.h>
 
 #define HGE_VERSION 0x180
 
@@ -63,12 +64,13 @@ typedef unsigned char       BYTE;
 /*
 ** HGE Handle types
 */
-typedef DWORD HTEXTURE;
-typedef DWORD HTARGET;
-typedef DWORD HEFFECT;
-typedef DWORD HMUSIC;
-typedef DWORD HSTREAM;
-typedef DWORD HCHANNEL;
+typedef uintptr_t HRESOURCE;
+typedef uintptr_t HTEXTURE;
+typedef uintptr_t HTARGET;
+typedef uintptr_t HEFFECT;
+typedef uintptr_t HMUSIC;
+typedef uintptr_t HSTREAM;
+typedef uintptr_t HCHANNEL;
 
 
 /*
