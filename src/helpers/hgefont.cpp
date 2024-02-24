@@ -31,7 +31,7 @@ hgeFont::hgeFont(const char *szFont, bool bMipmap)
 	int		i, x, y, w, h, a, c;
 
 	// Setup variables
-	
+
 	hge=hgeCreate(HGE_VERSION);
 
 	fHeight=0.0f;
@@ -47,8 +47,8 @@ hgeFont::hgeFont(const char *szFont, bool bMipmap)
 	dwCol=0xFFFFFFFF;
 
 	ZeroMemory( &letters, sizeof(letters) );
-	ZeroMemory( &pre, sizeof(letters) );
-	ZeroMemory( &post, sizeof(letters) );
+	ZeroMemory( &pre, sizeof(pre) );
+	ZeroMemory( &post, sizeof(post) );
 	
 	// Load font description
 

@@ -109,7 +109,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		// Load sound and texture
 		snd=hge->Effect_Load("menu.wav");
 		tex=hge->Texture_Load("particles.png");
-		if(!snd || !tex)
+		if(!tex)
 		{
 			// If one of the data files is not found, display
 			// an error message and shutdown.

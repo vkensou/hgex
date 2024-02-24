@@ -432,6 +432,9 @@ bool CALL HGE_Impl::Channel_IsSliding(HCHANNEL channel)
 
 bool HGE_Impl::_SoundInit()
 {
+#if _WIN64
+	return true;
+#endif
 	if(!bUseSound || hBass) return true;
 
 	hBass=LoadLibrary("bass.dll");
