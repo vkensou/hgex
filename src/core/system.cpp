@@ -490,7 +490,7 @@ void CALL HGE_Impl::System_SetStateString(hgeStringState state, const char *valu
 	switch(state)
 	{
 		case HGE_ICON:			szIcon=value;
-								if(pHGE->hwnd) SetClassLong(pHGE->hwnd, GCL_HICON, (LONG)LoadIcon(pHGE->hInstance, szIcon));
+								if(pHGE->hwnd) SetClassLongPtr(pHGE->hwnd, GCLP_HICON, (LONG_PTR)LoadIcon(pHGE->hInstance, szIcon));
 								break;
 		case HGE_TITLE:			strcpy(szWinTitle,value);
 								if(pHGE->hwnd) SetWindowText(pHGE->hwnd, szWinTitle);
@@ -611,7 +611,7 @@ void CALL HGE_Impl::System_Log(const char *szFormat, ...)
 
 bool CALL HGE_Impl::System_Launch(const char *url)
 {
-	if((DWORD)ShellExecute(pHGE->hwnd, NULL, url, NULL, NULL, SW_SHOWMAXIMIZED)>32) return true;
+	if((LONG_PTR)ShellExecute(pHGE->hwnd, NULL, url, NULL, NULL, SW_SHOWMAXIMIZED)>32) return true;
 	else return false;
 }
 
