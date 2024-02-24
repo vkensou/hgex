@@ -1,7 +1,7 @@
 
 
 #include "texasm.h"
-#include "libPNG\png.h"
+#include "png.h"
 
 class PNGError {};
 
