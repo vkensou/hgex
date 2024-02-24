@@ -10,6 +10,7 @@
 #include "particleed.h"
 #include <windows.h>
 #include <string>
+#include <direct.h>
 
 using namespace std;
 
@@ -385,9 +386,9 @@ void cmdSavePreset(int n)
 	if(!state.ps) return;
 
 	ZeroMemory(filename, _MAX_PATH);
-	GetModuleFileName(GetModuleHandle(NULL), filename, _MAX_PATH);
+	getcwd(filename, sizeof(filename));
 	string s(filename);
-	s=s.substr(0,s.rfind('\\'))+"\\"+"particle"+char('1'+n)+".psi";
+	s=s+"\\"+"particle"+char('1'+n)+".psi";
 	strcpy(filename, s.c_str());
 
 	state.ps->info.sprite=(hgeSprite*)(sprParticles->GetFrame() | sprParticles->GetBlendMode()<<16);
@@ -407,9 +408,9 @@ void cmdLoadPreset(int n)
 	if(!state.ps) return;
 
 	ZeroMemory(filename, _MAX_PATH);
-	GetModuleFileName(GetModuleHandle(NULL), filename, _MAX_PATH);
+	getcwd(filename, sizeof(filename));
 	string s(filename);
-	s=s.substr(0,s.rfind('\\'))+"\\"+"particle"+char('1'+n)+".psi";
+	s=s+"\\"+"particle"+char('1'+n)+".psi";
 	strcpy(filename, s.c_str());
 
 	hF = CreateFile( filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
