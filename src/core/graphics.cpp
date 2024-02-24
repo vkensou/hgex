@@ -570,7 +570,7 @@ void HGE_Impl::_render_batch(bool bEndScene)
 		}
 
 		if(bEndScene) VertArray = 0;
-		pVB->Lock( 0, 0, (void**)&VertArray, 0 );
+		else pVB->Lock( 0, 0, (void**)&VertArray, 0 );
 	}
 }
 
