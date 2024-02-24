@@ -21,7 +21,7 @@ hgeParticleSystem::hgeParticleSystem(const char *filename, hgeSprite *sprite)
 
 	psi=hge->Resource_Load(filename);
 	if(!psi) return;
-	memcpy(&info, psi, sizeof(hgeParticleSystemInfo));
+	memcpy(((char*)&info+(sizeof(hgeSprite*) - 4)), psi, sizeof(hgeParticleSystemInfo) - (sizeof(hgeSprite*) - 4));
 	hge->Resource_Free(psi);
 	info.sprite=sprite;
 
