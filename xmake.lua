@@ -12,7 +12,9 @@ target("bass")
     add_headerfiles("deps/bass/include/*.h")
 
     after_build("windows", function(target)
-        os.cp("deps/bass/bin/bass.dll", target:targetdir())
+        if (is_arch("x86")) then
+            os.cp("deps/bass/bin/bass.dll", target:targetdir())
+        end
     end)
 
 target("hgex")
@@ -33,6 +35,9 @@ target("hgex")
 
         if (is_arch("x86")) then
             add_linkdirs("deps/dx9sdkmini/lib/x86")
+            add_links("d3d9.lib", "d3dx9.lib")
+        elseif (is_arch("x64")) then
+            add_linkdirs("deps/dx9sdkmini/lib/x64")
             add_links("d3d9.lib", "d3dx9.lib")
         end
     end
