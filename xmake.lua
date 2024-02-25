@@ -3,7 +3,19 @@ add_cxflags("/EHsc")
 add_cxflags("/permissive")
 set_languages("cxx20")
 
+package("cgpu")
+    add_urls("https://github.com/vkensou/cgpu.git")
+    add_versions("latest", "develop")
+
+    add_deps("spirv-reflect")
+
+    on_install(function(package)
+        import("package.tools.xmake").install(package, {}, {target="cgpu"})
+    end)
+package_end()
+
 add_requires("minizip", "libpng")
+add_requires("cgpu")
 
 target("bass")
     set_kind("headeronly")
@@ -22,6 +34,7 @@ target("hgex")
 
     add_deps("bass")
     add_packages("minizip")
+    add_packages("cgpu")
 
     add_defines("HGEDLL")
 
