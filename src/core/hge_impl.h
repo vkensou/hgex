@@ -36,7 +36,8 @@ struct CRenderTargetList
 
 struct CTextureList
 {
-	HTEXTURE			tex;
+	CGPUTextureId		tex;
+	CGPUTextureViewId	tex_view;
 	int					width;
 	int					height;
 	CTextureList*		next;
@@ -291,6 +292,7 @@ public:
 	CGPUShaderEntryDescriptor default_shader[2];
 	CGPURootSignatureId default_shader_root_sig;
 	std::unordered_map<uint32_t, CGPURenderPipelineId> default_shader_pipelines;
+	CGPUSamplerId sampler;
 
 	CTextureList*		textures;
 	hgeVertex*			VertArray;

@@ -16,6 +16,7 @@ package_end()
 
 add_requires("minizip", "libpng")
 add_requires("cgpu")
+add_requires("freeimage")
 
 target("bass")
     set_kind("headeronly")
@@ -35,7 +36,8 @@ target("hgex")
     add_deps("bass")
     add_packages("minizip")
     add_packages("cgpu")
-
+    add_packages("freeimage")
+    
     add_defines("HGEDLL")
 
     if (is_os("windows")) then

@@ -8,8 +8,7 @@
 
 
 #include "hge_impl.h"
-#include <d3d9.h>
-#include <d3dx9.h>
+#include "FreeImage.h"
 
 void hge_graphicslog(void* user_data, ECGPULogSeverity severity, const char* fmt, ...)
 {
@@ -314,14 +313,153 @@ HTEXTURE CALL HGE_Impl::Texture_Create(int width, int height)
 	return 0;
 }
 
+static void SwizzleFIBitmapDataToRGBA32(uint8_t* bits, int width, int height, int pitch)
+{
+	for (int y = 0; y < height; ++y)
+	{
+		uint32_t* pixel = (uint32_t*)bits;
+		for (int x = 0; x < width; x++)
+		{
+			uint32_t c = pixel[x];
+			pixel[x] = (((c & FI_RGBA_ALPHA_MASK) >> FI_RGBA_ALPHA_SHIFT) << 24)
+				+ (((c & FI_RGBA_RED_MASK) >> FI_RGBA_RED_SHIFT) << 0)
+				+ (((c & FI_RGBA_GREEN_MASK) >> FI_RGBA_GREEN_SHIFT) << 8)
+				+ (((c & FI_RGBA_BLUE_MASK) >> FI_RGBA_BLUE_SHIFT) << 16);
+		}
+		bits += pitch;
+	}
+}
+
 HTEXTURE CALL HGE_Impl::Texture_Load(const char *filename, DWORD size, bool bMipmap)
 {
-	return 0;
+	void* data;
+	DWORD _size;
+	CTextureList* texItem;
+
+	if (size) { data = (void*)filename; _size = size; }
+	else
+	{
+		data = pHGE->Resource_Load(filename, &_size);
+		if (!data) return NULL;
+	}
+
+	FIMEMORY* memory = FreeImage_OpenMemory((BYTE*)data, size);
+	if (!memory)
+		return NULL;
+	auto fiformat = FreeImage_GetFileTypeFromMemory(memory, size);
+	if (fiformat == FIF_UNKNOWN)
+	{
+		FreeImage_CloseMemory(memory);
+		return NULL;
+	}
+	auto png = FreeImage_LoadFromMemory(fiformat, memory, PNG_DEFAULT);
+	uint32_t width = FreeImage_GetWidth(png);
+	uint32_t height = FreeImage_GetHeight(png);
+	auto type = FreeImage_GetImageType(png);
+	uint32_t bpp = FreeImage_GetBPP(png);
+	uint32_t pitch = FreeImage_GetPitch(png);
+	auto bits = (uint8_t*)FreeImage_GetBits(png);
+	//SwizzleFIBitmapDataToRGBA32(bits, width, height, pitch);
+
+	CGPUTextureDescriptor texture_desc =
+	{
+		.width = (uint64_t)width,
+		.height = (uint64_t)height,
+		.depth = 1,
+		.array_size = 1,
+		.format = CGPU_FORMAT_R8G8B8A8_SRGB,
+		.mip_levels = 1,
+		.owner_queue = gfx_queue,
+		.start_state = CGPU_RESOURCE_STATE_COPY_DEST,
+		.descriptors = CGPU_RESOURCE_TYPE_TEXTURE,
+	};
+
+	auto texture = cgpu_create_texture(device, &texture_desc);
+
+	CGPUTextureViewDescriptor view_desc = {
+		.texture = texture,
+		.format = texture->info->format,
+		.usages = CGPU_TVU_SRV,
+		.aspects = CGPU_TVA_COLOR,
+	};
+	auto texture_view = cgpu_create_texture_view(device, &view_desc);
+
+	CGPUCommandPoolDescriptor cmd_pool_desc = {};
+	CGPUCommandBufferDescriptor cmd_desc = {};
+	CGPUBufferDescriptor upload_buffer_desc = {};
+	upload_buffer_desc.name = u8"UploadBuffer";
+	upload_buffer_desc.flags = CGPU_BCF_PERSISTENT_MAP_BIT;
+	upload_buffer_desc.descriptors = CGPU_RESOURCE_TYPE_NONE;
+	upload_buffer_desc.memory_usage = CGPU_MEM_USAGE_CPU_ONLY;
+	upload_buffer_desc.size = pitch * height;
+	CGPUBufferId tex_upload_buffer = cgpu_create_buffer(device, &upload_buffer_desc);
+	{
+		memcpy(tex_upload_buffer->info->cpu_mapped_address, bits, pitch * height);
+	}
+	auto cpy_cmd_pool = cgpu_create_command_pool(gfx_queue, &cmd_pool_desc);
+	auto cpy_cmd = cgpu_create_command_buffer(cpy_cmd_pool, &cmd_desc);
+	cgpu_cmd_begin(cpy_cmd);
+	CGPUBufferToTextureTransfer b2t = {};
+	b2t.src = tex_upload_buffer;
+	b2t.src_offset = 0;
+	b2t.dst = texture;
+	b2t.dst_subresource.mip_level = 0;
+	b2t.dst_subresource.base_array_layer = 0;
+	b2t.dst_subresource.layer_count = 1;
+	cgpu_cmd_transfer_buffer_to_texture(cpy_cmd, &b2t);
+	CGPUTextureBarrier srv_barrier = {};
+	srv_barrier.texture = texture;
+	srv_barrier.src_state = CGPU_RESOURCE_STATE_COPY_DEST;
+	srv_barrier.dst_state = CGPU_RESOURCE_STATE_SHADER_RESOURCE;
+	CGPUResourceBarrierDescriptor barrier_desc1 = {};
+	barrier_desc1.texture_barriers = &srv_barrier;
+	barrier_desc1.texture_barriers_count = 1;
+	cgpu_cmd_resource_barrier(cpy_cmd, &barrier_desc1);
+	cgpu_cmd_end(cpy_cmd);
+	CGPUQueueSubmitDescriptor cpy_submit = {};
+	cpy_submit.cmds = &cpy_cmd;
+	cpy_submit.cmds_count = 1;
+	cgpu_submit_queue(gfx_queue, &cpy_submit);
+	cgpu_wait_queue_idle(gfx_queue);
+	cgpu_free_command_buffer(cpy_cmd);
+	cgpu_free_command_pool(cpy_cmd_pool);
+	cgpu_free_buffer(tex_upload_buffer);
+
+	FreeImage_CloseMemory(memory);
+	if (!size) Resource_Free(data);
+
+	texItem = new CTextureList;
+	texItem->tex = texture;
+	texItem->tex_view = texture_view;
+	texItem->width = texture->info->width;
+	texItem->height = texture->info->height;
+	texItem->next = textures;
+	textures = texItem;
+
+	return (HTEXTURE)texture_view;
 }
 
 void CALL HGE_Impl::Texture_Free(HTEXTURE tex)
 {
+	CGPUTextureId texture;
+	CGPUTextureViewId texture_view = (CGPUTextureViewId)tex;
+	CTextureList* texItem = textures, * texPrev = 0;
 
+	while (texItem)
+	{
+		if (texItem->tex_view == texture_view)
+		{
+			texture = texItem->tex;
+			if (texPrev) texPrev->next = texItem->next;
+			else textures = texItem->next;
+			delete texItem;
+			break;
+		}
+		texPrev = texItem;
+		texItem = texItem->next;
+	}
+	if (texture_view) cgpu_free_texture_view(texture_view);
+	if (texture) cgpu_free_texture(texture);
 }
 
 int CALL HGE_Impl::Texture_GetWidth(HTEXTURE tex, bool bOriginal)
@@ -402,6 +540,8 @@ void HGE_Impl::_SetProjectionMatrix(int width, int height)
 
 bool HGE_Impl::_GfxInit()
 {
+	FreeImage_Initialise(true);
+
 	CGPUInstanceDescriptor instance_desc = {
 		.backend = CGPU_BACKEND_VULKAN,
 		.enable_debug_layer = true,
@@ -593,6 +733,18 @@ bool HGE_Impl::_GfxInit()
 	};
 	default_shader_root_sig = cgpu_create_root_signature(device, &default_rs_desc);
 
+	CGPUSamplerDescriptor sampler_desc = {
+		.min_filter = CGPU_FILTER_TYPE_LINEAR,
+		.mag_filter = CGPU_FILTER_TYPE_LINEAR,
+		.mipmap_mode = CGPU_MIPMAP_MODE_LINEAR,
+		.address_u = CGPU_ADDRESS_MODE_REPEAT,
+		.address_v = CGPU_ADDRESS_MODE_REPEAT,
+		.address_w = CGPU_ADDRESS_MODE_REPEAT,
+		.mip_lod_bias = 0,
+		.max_anisotropy = 1,
+	};
+	sampler = cgpu_create_sampler(device, &sampler_desc);
+
 	return true;
 }
 
@@ -664,6 +816,9 @@ void HGE_Impl::_GfxDone()
 	}
 	swapchain_infos.clear();
 
+	cgpu_free_sampler(sampler);
+	sampler = CGPU_NULLPTR;
+
 	if (pVB)
 		cgpu_free_buffer(pVB);
 	pVB = CGPU_NULLPTR;
@@ -708,6 +863,8 @@ void HGE_Impl::_GfxDone()
 	device = CGPU_NULLPTR;
 	cgpu_free_instance(instance);
 	instance = CGPU_NULLPTR;
+
+	FreeImage_DeInitialise();
 }
 
 bool HGE_Impl::_GfxRestore()
