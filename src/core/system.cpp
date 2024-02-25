@@ -629,6 +629,8 @@ HGE_Impl::HGE_Impl()
 	pIB = CGPU_NULLPTR;
 	VertArray=0;
 	textures=0;
+	nPrim = 0;
+	CurPrimType = 0;
 
 	hBass=0;
 	bSilent=false;

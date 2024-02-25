@@ -287,6 +287,9 @@ public:
 	bool prepared;
 	CGPUBufferId pVB;
 	CGPUBufferId pIB;
+	CGPUShaderEntryDescriptor default_shader[2];
+	CGPURootSignatureId default_shader_root_sig;
+	CGPURenderPipelineId default_pipeline;
 
 	CTextureList*		textures;
 	hgeVertex*			VertArray;
