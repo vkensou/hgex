@@ -15,7 +15,11 @@ void hge_graphicslog(void* user_data, ECGPULogSeverity severity, const char* fmt
 {
 	va_list args;
 	va_start(args, fmt);
-	vprintf(fmt, args);
+	//vprintf(fmt, args);
+	size_t nLen = _vscprintf(fmt, args) + 1;
+	char* strBuffer = new char[nLen + 8];
+	_vsnprintf_s(strBuffer, nLen, nLen, fmt, args);
+	OutputDebugString(strBuffer);
 	va_end(args);
 }
 
@@ -112,7 +116,7 @@ void CALL HGE_Impl::Gfx_Clear(DWORD color)
 }
 
 void CALL HGE_Impl::Gfx_SetClipping(int x, int y, int w, int h)
-{
+{ 
 
 }
 
@@ -165,6 +169,8 @@ void CALL HGE_Impl::Gfx_EndScene()
 
 	if (prepared)
 	{
+		_render_batch(true);
+
 		cgpu_cmd_end_render_pass(cur_cmd, cur_rp_encoder);
 	}
 
@@ -205,17 +211,74 @@ void CALL HGE_Impl::Gfx_EndScene()
 
 void CALL HGE_Impl::Gfx_RenderLine(float x1, float y1, float x2, float y2, DWORD color, float z)
 {
+	if (VertArray)
+	{
+		if (CurPrimType != HGEPRIM_LINES || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_LINES || CurTexture || CurBlendMode != BLEND_DEFAULT)
+		{
+			_render_batch();
 
+			CurPrimType = HGEPRIM_LINES;
+			if (CurBlendMode != BLEND_DEFAULT) _SetBlendMode(BLEND_DEFAULT);
+			if (CurTexture)
+			{
+				//pD3DDevice->SetTexture(0, 0);
+				CurTexture = 0;
+			}
+		}
+
+		int i = nPrim * HGEPRIM_LINES;
+		VertArray[i].x = x1; VertArray[i + 1].x = x2;
+		VertArray[i].y = y1; VertArray[i + 1].y = y2;
+		VertArray[i].z = VertArray[i + 1].z = z;
+		VertArray[i].col = VertArray[i + 1].col = color;
+		VertArray[i].tx = VertArray[i + 1].tx =
+			VertArray[i].ty = VertArray[i + 1].ty = 0.0f;
+
+		nPrim++;
+	}
 }
 
 void CALL HGE_Impl::Gfx_RenderTriple(const hgeTriple *triple)
 {
+	if (VertArray)
+	{
+		if (CurPrimType != HGEPRIM_TRIPLES || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_TRIPLES || CurTexture != triple->tex || CurBlendMode != triple->blend)
+		{
+			_render_batch();
 
+			CurPrimType = HGEPRIM_TRIPLES;
+			if (CurBlendMode != triple->blend) _SetBlendMode(triple->blend);
+			if (triple->tex != CurTexture) {
+				//pD3DDevice->SetTexture(0, (LPDIRECT3DTEXTURE9)triple->tex);
+				CurTexture = triple->tex;
+			}
+		}
+
+		memcpy(&VertArray[nPrim * HGEPRIM_TRIPLES], triple->v, sizeof(hgeVertex) * HGEPRIM_TRIPLES);
+		nPrim++;
+	}
 }
 
 void CALL HGE_Impl::Gfx_RenderQuad(const hgeQuad *quad)
 {
+	if (VertArray)
+	{
+		if (CurPrimType != HGEPRIM_QUADS || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_QUADS || CurTexture != quad->tex || CurBlendMode != quad->blend)
+		{
+			_render_batch();
 
+			CurPrimType = HGEPRIM_QUADS;
+			if (CurBlendMode != quad->blend) _SetBlendMode(quad->blend);
+			if (quad->tex != CurTexture)
+			{
+				//pD3DDevice->SetTexture(0, (LPDIRECT3DTEXTURE9)quad->tex);
+				CurTexture = quad->tex;
+			}
+		}
+
+		memcpy(&VertArray[nPrim * HGEPRIM_QUADS], quad->v, sizeof(hgeVertex) * HGEPRIM_QUADS);
+		nPrim++;
+	}
 }
 
 hgeVertex* CALL HGE_Impl::Gfx_StartBatch(int prim_type, HTEXTURE tex, int blend, int *max_prim)
@@ -285,7 +348,35 @@ void CALL HGE_Impl::Texture_Unlock(HTEXTURE tex)
 
 void HGE_Impl::_render_batch(bool bEndScene)
 {
+	if (VertArray)
+	{
+		const uint32_t vert_stride = sizeof(hgeVertex);
+		if (nPrim)
+		{
+			switch (CurPrimType)
+			{
+			case HGEPRIM_QUADS:
+				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &pVB, &vert_stride, CGPU_NULLPTR);
+				cgpu_render_encoder_draw(cur_rp_encoder, nPrim << 2, (VertArray - pVB->info->cpu_mapped_address) / vert_stride);
+				break;
 
+			case HGEPRIM_TRIPLES:
+				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &pVB, &vert_stride, CGPU_NULLPTR);
+				cgpu_render_encoder_draw(cur_rp_encoder, nPrim * 3, (VertArray - pVB->info->cpu_mapped_address) / vert_stride);
+				break;
+
+			case HGEPRIM_LINES:
+				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &pVB, &vert_stride, CGPU_NULLPTR);
+				cgpu_render_encoder_draw(cur_rp_encoder, nPrim, (VertArray - pVB->info->cpu_mapped_address) / vert_stride);
+				break;
+			}
+
+			nPrim = 0;
+		}
+
+		if (bEndScene) VertArray = 0;
+		else VertArray += sizeof(hgeVertex) * 4;
+	}
 }
 
 void HGE_Impl::_SetBlendMode(int blend)
@@ -388,8 +479,8 @@ bool HGE_Impl::_GfxInit()
 			.renderpass = render_pass,
 			.attachment_count = 1,
 			.attachments = &info.texture_view,
-			.width = (uint32_t)nScreenWidth,
-			.height = (uint32_t)nScreenHeight,
+			.width = (uint32_t)info.texture->info->width,
+			.height = (uint32_t)info.texture->info->height,
 			.layers = 1,
 		};
 		info.framebuffer = cgpu_create_framebuffer(device, &framebuffer_desc);
@@ -411,6 +502,54 @@ bool HGE_Impl::_GfxInit()
 
 	current_swapchain_index = 0;
 	current_frame_index = 0;
+
+	uint64_t vb_size = VERTEX_BUFFER_SIZE * sizeof(hgeVertex);
+	CGPUBufferDescriptor vb_desc = {
+		.size = vb_size,
+		.name = u8"pVB",
+		.descriptors = CGPU_RESOURCE_TYPE_VERTEX_BUFFER,
+		.memory_usage = CGPU_MEM_USAGE_GPU_ONLY,
+		.flags = CGPU_BCF_HOST_VISIBLE,
+		.start_state = CGPU_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+	};
+	pVB = cgpu_create_buffer(device, &vb_desc);
+
+	CGPUBufferRange vb_range = { .offset = 0, .size = vb_size };
+	cgpu_map_buffer(pVB, &vb_range);
+	VertArray = (hgeVertex*)pVB->info->cpu_mapped_address;
+
+	uint64_t ib_size = VERTEX_BUFFER_SIZE * 6 / 4 * sizeof(WORD);
+	CGPUBufferDescriptor ib_desc = {
+		.size = ib_size,
+		.name = u8"pIB",
+		.descriptors = CGPU_RESOURCE_TYPE_INDEX_BUFFER,
+		.memory_usage = CGPU_MEM_USAGE_GPU_ONLY,
+		.flags = CGPU_BCF_HOST_VISIBLE,
+		.start_state = CGPU_RESOURCE_STATE_INDEX_BUFFER,
+	};
+	pIB = cgpu_create_buffer(device, &ib_desc);
+
+	if (!pIB)
+	{
+		_PostError("Can't lock D3D index buffer");
+		return false;
+	}
+
+	CGPUBufferRange range = { .offset = 0, .size = ib_size };
+	cgpu_map_buffer(pIB, &range);
+
+	WORD* pIndices = (WORD*)pIB->info->cpu_mapped_address, n = 0;
+	for (int i = 0; i < VERTEX_BUFFER_SIZE / 4; i++) {
+		*pIndices++ = n;
+		*pIndices++ = n + 1;
+		*pIndices++ = n + 2;
+		*pIndices++ = n + 2;
+		*pIndices++ = n + 3;
+		*pIndices++ = n;
+		n += 4;
+	}
+
+	cgpu_unmap_buffer(pIB);
 
 	return true;
 }
@@ -482,6 +621,14 @@ void HGE_Impl::_GfxDone()
 		cgpu_free_framebuffer(info.framebuffer);
 	}
 	swapchain_infos.clear();
+
+	if (pVB)
+		cgpu_free_buffer(pVB);
+	pVB = CGPU_NULLPTR;
+
+	if (pIB)
+		cgpu_free_buffer(pIB);
+	pIB = CGPU_NULLPTR;
 
 	// for (auto shader : deleted_shaders)
 	// 	deleteShaderImpl(shader);

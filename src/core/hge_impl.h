@@ -285,6 +285,8 @@ public:
 	CGPUCommandBufferId cur_cmd;
 	CGPURenderPassEncoderId cur_rp_encoder;
 	bool prepared;
+	CGPUBufferId pVB;
+	CGPUBufferId pIB;
 
 	CTextureList*		textures;
 	hgeVertex*			VertArray;

@@ -625,6 +625,8 @@ HGE_Impl::HGE_Impl()
 	swapchain = CGPU_NULLPTR;
 	render_pass = CGPU_NULLPTR;
 	render_finished_semaphore = CGPU_NULLPTR;
+	pVB = CGPU_NULLPTR;
+	pIB = CGPU_NULLPTR;
 	VertArray=0;
 	textures=0;
 
