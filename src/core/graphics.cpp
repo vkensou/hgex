@@ -82,7 +82,33 @@ void hge_graphicsfree_aligned(void *user_data, void *ptr, size_t alignment, cons
 
 void CALL HGE_Impl::Gfx_Clear(DWORD color)
 {
+	if (prepared)
+		return;
 
+	auto &cur_frame_data = frame_datas[current_frame_index];
+	auto &cur_swapchain_info = swapchain_infos[current_swapchain_index];
+
+	const CGPUClearValue clearColor = {
+		.color = {GETR(color) / 255.0f, GETG(color) / 255.0f, GETB(color) / 255.0f, 1},
+		.is_color = true,
+	};
+
+	CGPUBeginRenderPassInfo begin_info = {
+		.render_pass = render_pass,
+		.framebuffer = cur_swapchain_info.framebuffer,
+		.clear_value_count = 1,
+		.clear_values = &clearColor,
+	};
+
+	cur_rp_encoder = cgpu_cmd_begin_render_pass(cur_cmd, &begin_info);
+
+	cgpu_render_encoder_set_viewport(cur_rp_encoder,
+									 0.0f, 0.0f,
+									 (float)nScreenWidth, (float)nScreenHeight,
+									 0.f, 1.f);
+	cgpu_render_encoder_set_scissor(cur_rp_encoder, 0, 0, nScreenWidth, nScreenHeight);
+
+	prepared = true;
 }
 
 void CALL HGE_Impl::Gfx_SetClipping(int x, int y, int w, int h)
@@ -97,13 +123,84 @@ void CALL HGE_Impl::Gfx_SetTransform(float x, float y, float dx, float dy, float
 
 bool CALL HGE_Impl::Gfx_BeginScene(HTARGET targ)
 {
+	auto &cur_frame_data = frame_datas[current_frame_index];
+	cgpu_wait_fences(&cur_frame_data.inflight_fence, 1);
+
+	prepared = false;
+
+	cgpu_reset_command_pool(cur_frame_data.pool);
+
+	for (auto cmd : cur_frame_data.allocated_cmds)
+		cur_frame_data.cmds.push_back(cmd);
+	cur_frame_data.allocated_cmds.clear();
+
+	CGPUAcquireNextDescriptor acquire_desc = {
+		.signal_semaphore = cur_frame_data.prepared_semaphore,
+	};
+
+	current_swapchain_index = cgpu_acquire_next_image(swapchain, &acquire_desc);
+	auto &cur_swapchain_info = swapchain_infos[current_swapchain_index];
+
+	auto back_buffer = cur_swapchain_info.texture;
+	auto back_buffer_view = cur_swapchain_info.texture_view;
+	auto prepared_semaphore = cur_frame_data.prepared_semaphore;
+
+	cur_cmd = _RequestCmd(cur_frame_data);
+	cgpu_cmd_begin(cur_cmd);
+
+	CGPUTextureBarrier draw_barrier = {
+		.texture = back_buffer,
+		.src_state = CGPU_RESOURCE_STATE_UNDEFINED,
+		.dst_state = CGPU_RESOURCE_STATE_RENDER_TARGET};
+	CGPUResourceBarrierDescriptor barrier_desc0 = {.texture_barriers = &draw_barrier, .texture_barriers_count = 1};
+	cgpu_cmd_resource_barrier(cur_cmd, &barrier_desc0);
 
 	return true;
 }
 
 void CALL HGE_Impl::Gfx_EndScene()
 {
+	auto &cur_frame_data = frame_datas[current_frame_index];
+	auto &cur_swapchain_info = swapchain_infos[current_swapchain_index];
 
+	if (prepared)
+	{
+		cgpu_cmd_end_render_pass(cur_cmd, cur_rp_encoder);
+	}
+
+	auto back_buffer = cur_swapchain_info.texture;
+	auto back_buffer_view = cur_swapchain_info.texture_view;
+	auto prepared_semaphore = cur_frame_data.prepared_semaphore;
+
+	CGPUTextureBarrier present_barrier = {
+		.texture = back_buffer,
+		.src_state = CGPU_RESOURCE_STATE_RENDER_TARGET,
+		.dst_state = CGPU_RESOURCE_STATE_PRESENT};
+	CGPUResourceBarrierDescriptor barrier_desc1 = {.texture_barriers = &present_barrier, .texture_barriers_count = 1};
+	cgpu_cmd_resource_barrier(cur_cmd, &barrier_desc1);
+
+	cgpu_cmd_end(cur_cmd);
+
+	CGPUQueueSubmitDescriptor submit_desc = {
+		.cmds = cur_frame_data.allocated_cmds.data(),
+		.signal_fence = cur_frame_data.inflight_fence,
+		.wait_semaphores = &prepared_semaphore,
+		.signal_semaphores = &render_finished_semaphore,
+		.cmds_count = (uint32_t)cur_frame_data.allocated_cmds.size(),
+		.wait_semaphore_count = 1,
+		.signal_semaphore_count = 1,
+	};
+	cgpu_submit_queue(gfx_queue, &submit_desc);
+
+	CGPUQueuePresentDescriptor present_desc = {
+		.swapchain = swapchain,
+		.wait_semaphores = &render_finished_semaphore,
+		.wait_semaphore_count = 1,
+		.index = (uint8_t)current_swapchain_index,
+	};
+	cgpu_queue_present(present_queue, &present_desc);
+
+	current_frame_index = (current_frame_index + 1) % swapchain->buffer_count;
 }
 
 void CALL HGE_Impl::Gfx_RenderLine(float x1, float y1, float x2, float y2, DWORD color, float z)

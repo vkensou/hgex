@@ -282,6 +282,9 @@ public:
 	std::vector<PerFrameData> frame_datas;
 	uint32_t current_frame_index;
 	CGPUSemaphoreId render_finished_semaphore;
+	CGPUCommandBufferId cur_cmd;
+	CGPURenderPassEncoderId cur_rp_encoder;
+	bool prepared;
 
 	CTextureList*		textures;
 	hgeVertex*			VertArray;
