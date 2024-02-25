@@ -12,8 +12,8 @@
 
 #include "..\..\include\hge.h"
 #include <stdio.h>
-#include <d3d9.h>
-#include <d3dx9.h>
+#include "cgpu/api.h"
+#include <vector>
 
 #define DEMO
 
@@ -28,8 +28,8 @@ struct CRenderTargetList
 {
 	int					width;
 	int					height;
-	IDirect3DTexture9*	pTex;
-	IDirect3DSurface9*	pDepth;
+	void*	pTex;
+	void*	pDepth;
 	CRenderTargetList*	next;
 };
 
@@ -61,6 +61,23 @@ struct CInputEventList
 	CInputEventList*	next;
 };
 
+struct PerSwapChainInfo
+{
+	CGPUTextureId texture;
+	CGPUTextureViewId texture_view;
+	CGPUFramebufferId framebuffer;
+};
+
+struct PerFrameData
+{
+	CGPUFenceId inflight_fence{ CGPU_NULLPTR };
+	CGPUSemaphoreId prepared_semaphore{ CGPU_NULLPTR };
+	CGPUCommandPoolId pool{ CGPU_NULLPTR };
+	std::vector<CGPUCommandBufferId> cmds;
+	std::vector<CGPUCommandBufferId> allocated_cmds;
+	std::vector<CGPUDescriptorSetId> allocated_descriptor_sets;
+	CGPUDescriptorSetId last_descriptor_set{ CGPU_NULLPTR };
+};
 
 void DInit();
 void DDone();
@@ -249,28 +266,22 @@ public:
 
 
 	// Graphics
-	D3DPRESENT_PARAMETERS*  d3dpp;
-
-	D3DPRESENT_PARAMETERS   d3dppW;
-	RECT					rectW;
-	LONG					styleW;
-
-	D3DPRESENT_PARAMETERS   d3dppFS;
-	RECT					rectFS;
-	LONG					styleFS;
-
-	IDirect3D9*				pD3D;
-	IDirect3DDevice9*		pD3DDevice;
-	IDirect3DVertexBuffer9*	pVB;
-	IDirect3DIndexBuffer9*	pIB;
-
-	IDirect3DSurface9*	pScreenSurf;
-	IDirect3DSurface9*	pScreenDepth;
-	CRenderTargetList*	pTargets;
-	CRenderTargetList*	pCurTarget;
-
-	D3DXMATRIX			matView;
-	D3DXMATRIX			matProj;
+	CGPUInstanceId instance;
+	CGPUDeviceId device;
+	CGPUQueueId gfx_queue;
+	CGPUQueueId present_queue;
+	CGPUSurfaceId surface;
+	CGPUSwapChainId swapchain;
+	RECT rectW;
+	LONG styleW;
+	RECT rectFS;
+	LONG styleFS;
+	std::vector<PerSwapChainInfo> swapchain_infos;
+	uint32_t current_swapchain_index;
+	CGPURenderPassId render_pass;
+	std::vector<PerFrameData> frame_datas;
+	uint32_t current_frame_index;
+	CGPUSemaphoreId render_finished_semaphore;
 
 	CTextureList*		textures;
 	hgeVertex*			VertArray;
@@ -287,10 +298,9 @@ public:
 	void				_Resize(int width, int height);
 	bool				_init_lost();
 	void				_render_batch(bool bEndScene=false);
-	int					_format_id(D3DFORMAT fmt);
 	void				_SetBlendMode(int blend);
 	void				_SetProjectionMatrix(int width, int height);
-	
+	CGPUCommandBufferId	_RequestCmd(PerFrameData &frame_data);
 
 	// Audio
 	HINSTANCE			hBass;

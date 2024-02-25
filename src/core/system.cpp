@@ -353,41 +353,21 @@ void CALL HGE_Impl::System_SetStateBool(hgeBoolState state, bool value)
 	switch(state)
 	{
 		case HGE_WINDOWED:		if(VertArray || hwndParent) break;
-								if(pD3DDevice && bWindowed != value)
+								if(device && bWindowed != value)
 								{
-									if(d3dppW.BackBufferFormat==D3DFMT_UNKNOWN || d3dppFS.BackBufferFormat==D3DFMT_UNKNOWN) break;
-
-									if(bWindowed) GetWindowRect(hwnd, &rectW);
-									bWindowed=value;
-									if(bWindowed) d3dpp=&d3dppW;
-									else d3dpp=&d3dppFS;
-
-									if(_format_id(d3dpp->BackBufferFormat) < 4) nScreenBPP=16;
-									else nScreenBPP=32;
-
-									_GfxRestore();
-									_AdjustWindow();
+									// TODO
 								}
 								else bWindowed=value;
 								break;
 
-		case HGE_ZBUFFER:		if(!pD3DDevice)	bZBuffer=value;
+		case HGE_ZBUFFER:		if(!device)	bZBuffer=value;
 								break;
 
 		case HGE_TEXTUREFILTER: bTextureFilter=value;
-								if(pD3DDevice)
+								if(device)
 								{
 									_render_batch();
-									if(bTextureFilter)
-									{
-										pD3DDevice->SetSamplerState(0,D3DSAMP_MAGFILTER,D3DTEXF_LINEAR);
-										pD3DDevice->SetSamplerState(0,D3DSAMP_MINFILTER,D3DTEXF_LINEAR);
-									}
-									else
-									{
-										pD3DDevice->SetSamplerState(0,D3DSAMP_MAGFILTER,D3DTEXF_POINT);
-										pD3DDevice->SetSamplerState(0,D3DSAMP_MINFILTER,D3DTEXF_POINT);
-									}
+									// TODO
 								}
 								break;
 
@@ -434,11 +414,11 @@ void CALL HGE_Impl::System_SetStateInt(hgeIntState state, int value)
 {
 	switch(state)
 	{
-		case HGE_SCREENWIDTH:	if(!pD3DDevice) nScreenWidth=value; break;
+		case HGE_SCREENWIDTH:	if(!surface) nScreenWidth=value; break;
 
-		case HGE_SCREENHEIGHT:	if(!pD3DDevice) nScreenHeight=value; break;
+		case HGE_SCREENHEIGHT:	if(!surface) nScreenHeight=value; break;
 
-		case HGE_SCREENBPP:		if(!pD3DDevice) nScreenBPP=value; break;
+		case HGE_SCREENBPP:		if(!surface) nScreenBPP=value; break;
 
 		case HGE_SAMPLERATE:	if(!hBass) nSampleRate=value;
 								break;
@@ -457,20 +437,11 @@ void CALL HGE_Impl::System_SetStateInt(hgeIntState state, int value)
 
 		case HGE_FPS:			if(VertArray) break;
 
-								if(pD3DDevice)
+								if(surface)
 								{
 									if((nHGEFPS>=0 && value <0) || (nHGEFPS<0 && value>=0))
 									{
-										if(value==HGEFPS_VSYNC)
-										{
-											d3dppW.SwapEffect = D3DSWAPEFFECT_COPY;
-											d3dppFS.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
-										}
-										else
-										{
-											d3dppW.SwapEffect = D3DSWAPEFFECT_COPY;
-											d3dppFS.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
-										}
+										// TODO
 										//if(procFocusLostFunc) procFocusLostFunc();
 										_GfxRestore();
 										//if(procFocusGainFunc) procFocusGainFunc();
@@ -617,7 +588,6 @@ bool CALL HGE_Impl::System_Launch(const char *url)
 
 void CALL HGE_Impl::System_Snapshot(const char *filename)
 {
-	LPDIRECT3DSURFACE9 pSurf;
 	char *shotname, tempname[_MAX_PATH];
 	int i;
 
@@ -634,12 +604,7 @@ void CALL HGE_Impl::System_Snapshot(const char *filename)
 		filename=Resource_MakePath(tempname);
 	}
 
-	if(pD3DDevice)
-	{
-		pD3DDevice->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &pSurf);
-		D3DXSaveSurfaceToFile(filename, D3DXIFF_BMP, pSurf, NULL, NULL);
-		pSurf->Release();
-	}
+	// TODO
 }
 
 //////// Implementation ////////
@@ -652,15 +617,14 @@ HGE_Impl::HGE_Impl()
 	bActive=false;
 	szError[0]=0;
 
-	pD3D=0;
-	pD3DDevice=0;
-	d3dpp=0;
-	pTargets=0;
-	pCurTarget=0;
-	pScreenSurf=0;
-	pScreenDepth=0;
-	pVB=0;
-	pIB=0;
+	instance = CGPU_NULLPTR;
+	device = CGPU_NULLPTR;
+	gfx_queue = CGPU_NULLPTR;
+	present_queue = CGPU_NULLPTR;
+	surface = CGPU_NULLPTR;
+	swapchain = CGPU_NULLPTR;
+	render_pass = CGPU_NULLPTR;
+	render_finished_semaphore = CGPU_NULLPTR;
 	VertArray=0;
 	textures=0;
 
@@ -753,7 +717,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 			return FALSE;
 		
 		case WM_PAINT:
-			if(pHGE->pD3D && pHGE->procRenderFunc && pHGE->bWindowed) pHGE->procRenderFunc();
+			if(pHGE->surface && pHGE->procRenderFunc && pHGE->bWindowed) pHGE->procRenderFunc();
 			break;
 
 		case WM_DESTROY:
@@ -770,7 +734,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 			// tricky: we should catch WA_ACTIVE and WA_CLICKACTIVE,
 			// but only if HIWORD(wParam) (fMinimized) == FALSE (0)
 			bActivating = (LOWORD(wparam) != WA_INACTIVE) && (HIWORD(wparam) == 0);
-			if(pHGE->pD3D && pHGE->bActive != bActivating) pHGE->_FocusChange(bActivating);
+			if(pHGE->surface && pHGE->bActive != bActivating) pHGE->_FocusChange(bActivating);
 			return FALSE;
 
 
@@ -847,7 +811,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 			return FALSE;
 
 		case WM_SIZE:
-			if(pHGE->pD3D && wparam==SIZE_RESTORED) pHGE->_Resize(LOWORD(lparam), HIWORD(lparam));
+			if(wparam==SIZE_RESTORED) pHGE->_Resize(LOWORD(lparam), HIWORD(lparam));
 			//return FALSE;
 			break;
 
