@@ -112,8 +112,6 @@ void CALL HGE_Impl::Gfx_Clear(DWORD color)
 									 0.f, 1.f);
 	cgpu_render_encoder_set_scissor(cur_rp_encoder, 0, 0, nScreenWidth, nScreenHeight);
 
-	cgpu_render_encoder_bind_pipeline(cur_rp_encoder, default_pipeline);
-
 	prepared = true;
 }
 
@@ -135,6 +133,7 @@ bool CALL HGE_Impl::Gfx_BeginScene(HTARGET targ)
 	prepared = false;
 	nPrim = 0;
 	CurPrimType = 0;
+	CurDefaultShaderPipeline = CGPU_NULLPTR;
 
 	cgpu_reset_command_pool(cur_frame_data.pool);
 
@@ -361,22 +360,28 @@ void HGE_Impl::_render_batch(bool bEndScene)
 			switch (CurPrimType)
 			{
 			case HGEPRIM_QUADS:
-				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &pVB, &vert_stride, CGPU_NULLPTR);
 				eaten = nPrim << 2;
-				cgpu_render_encoder_draw(cur_rp_encoder, eaten, (VertArray - pVB->info->cpu_mapped_address) / vert_stride);
 				break;
 
 			case HGEPRIM_TRIPLES:
-				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &pVB, &vert_stride, CGPU_NULLPTR);
 				eaten = nPrim * 3;
-				cgpu_render_encoder_draw(cur_rp_encoder, eaten, (VertArray - pVB->info->cpu_mapped_address) / vert_stride);
 				break;
 
 			case HGEPRIM_LINES:
-				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &pVB, &vert_stride, CGPU_NULLPTR);
-				eaten = nPrim;
-				cgpu_render_encoder_draw(cur_rp_encoder, eaten, (VertArray - pVB->info->cpu_mapped_address) / vert_stride);
+				eaten = nPrim * 2;
 				break;
+			}
+
+			if (eaten)
+			{
+				auto pipeline = _RequestPipeline(CurPrimType);
+				if (pipeline != CurDefaultShaderPipeline)
+				{
+					cgpu_render_encoder_bind_pipeline(cur_rp_encoder, pipeline);
+					CurDefaultShaderPipeline = pipeline;
+				}
+				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &pVB, &vert_stride, CGPU_NULLPTR);
+				cgpu_render_encoder_draw(cur_rp_encoder, eaten, (VertArray - pVB->info->cpu_mapped_address) / vert_stride);
 			}
 
 			nPrim = 0;
@@ -587,48 +592,6 @@ bool HGE_Impl::_GfxInit()
 		.shader_count = 2
 	};
 	default_shader_root_sig = cgpu_create_root_signature(device, &default_rs_desc);
-	ECGPUFormat formats[1] = { swapchainFormat };
-	CGPUVertexLayout vertex_layout = {
-		.attribute_count = 3,
-		.attributes = {
-			{ u8"POSITION", 1, CGPU_FORMAT_R32G32B32_SFLOAT, 0, 0, sizeof(float) * 3, CGPU_INPUT_RATE_VERTEX },
-			{ u8"COLOR", 1, CGPU_FORMAT_R8G8B8A8_UNORM, 0, sizeof(float) * 3, sizeof(uint32_t), CGPU_INPUT_RATE_VERTEX },
-			{ u8"TEXCOORD", 1, CGPU_FORMAT_R32G32_SFLOAT, 0, sizeof(float) * 4, sizeof(float) * 2, CGPU_INPUT_RATE_VERTEX },
-		}
-	};
-	CGPUBlendStateDescriptor blend_state = {
-		.src_factors = { CGPU_BLEND_CONST_ONE },
-		.dst_factors = { CGPU_BLEND_CONST_ZERO },
-		.src_alpha_factors = { CGPU_BLEND_CONST_ONE },
-		.dst_alpha_factors = { CGPU_BLEND_CONST_ZERO },
-		.blend_modes = { CGPU_BLEND_MODE_ADD },
-		.blend_alpha_modes = { CGPU_BLEND_MODE_ADD },
-		.masks = { CGPU_COLOR_MASK_ALL },
-		.alpha_to_coverage = false,
-		.independent_blend = false,
-	};
-	CGPUDepthStateDesc depth_state = {
-		.depth_test = false,
-		.depth_write = false,
-		.stencil_test = false,
-	};
-	CGPURasterizerStateDescriptor rasterizer_state = {
-		.cull_mode = CGPU_CULL_MODE_NONE,
-	};
-	CGPURenderPipelineDescriptor rp_desc = {
-		.root_signature = default_shader_root_sig,
-		.vertex_shader = &default_shader[0],
-		.fragment_shader = &default_shader[1],
-		.vertex_layout = &vertex_layout,
-		.blend_state = &blend_state,
-		.depth_state = &depth_state,
-		.rasterizer_state = &rasterizer_state,
-		.render_pass = render_pass,
-		.subpass = 0,
-		.render_target_count = 1,
-		.prim_topology = CGPU_PRIM_TOPO_TRI_STRIP,
-	};
-	default_pipeline = cgpu_create_render_pipeline(device, &rp_desc);
 
 	return true;
 }
@@ -709,12 +672,16 @@ void HGE_Impl::_GfxDone()
 		cgpu_free_buffer(pIB);
 	pIB = CGPU_NULLPTR;
 
-	cgpu_free_render_pipeline(default_pipeline);
+	for (auto [_, pipeline] : default_shader_pipelines)
+	{
+		cgpu_free_render_pipeline(pipeline);
+	}
+	default_shader_pipelines.clear();
+
 	cgpu_free_root_signature(default_shader_root_sig);
 	cgpu_free_shader_library(default_shader[0].library);
 	cgpu_free_shader_library(default_shader[1].library);
 
-	default_pipeline = CGPU_NULLPTR;
 	default_shader_root_sig = CGPU_NULLPTR;
 	memset(default_shader, 0, 2 * sizeof(CGPUShaderEntryDescriptor));
 
@@ -770,4 +737,71 @@ CGPUCommandBufferId HGE_Impl::_RequestCmd(PerFrameData &frame_data)
 
 	frame_data.allocated_cmds.push_back(cmd);
 	return cmd;
+}
+
+CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType)
+{
+	uint32_t key = (0x3 & (primType - 1));
+
+	auto iter = default_shader_pipelines.find(key);
+	if (iter != default_shader_pipelines.end())
+	{
+		return iter->second;
+	}
+	else
+	{
+		ECGPUFormat swapchainFormat = CGPU_FORMAT_R8G8B8A8_SRGB;
+		ECGPUFormat formats[1] = { swapchainFormat };
+		CGPUVertexLayout vertex_layout = {
+			.attribute_count = 3,
+			.attributes = {
+				{ u8"POSITION", 1, CGPU_FORMAT_R32G32B32_SFLOAT, 0, 0, sizeof(float) * 3, CGPU_INPUT_RATE_VERTEX },
+				{ u8"COLOR", 1, CGPU_FORMAT_R8G8B8A8_UNORM, 0, sizeof(float) * 3, sizeof(uint32_t), CGPU_INPUT_RATE_VERTEX },
+				{ u8"TEXCOORD", 1, CGPU_FORMAT_R32G32_SFLOAT, 0, sizeof(float) * 4, sizeof(float) * 2, CGPU_INPUT_RATE_VERTEX },
+			}
+		};
+		CGPUBlendStateDescriptor blend_state = {
+			.src_factors = { CGPU_BLEND_CONST_ONE },
+			.dst_factors = { CGPU_BLEND_CONST_ZERO },
+			.src_alpha_factors = { CGPU_BLEND_CONST_ONE },
+			.dst_alpha_factors = { CGPU_BLEND_CONST_ZERO },
+			.blend_modes = { CGPU_BLEND_MODE_ADD },
+			.blend_alpha_modes = { CGPU_BLEND_MODE_ADD },
+			.masks = { CGPU_COLOR_MASK_ALL },
+			.alpha_to_coverage = false,
+			.independent_blend = false,
+		};
+		CGPUDepthStateDesc depth_state = {
+			.depth_test = false,
+			.depth_write = false,
+			.stencil_test = false,
+		};
+		CGPURasterizerStateDescriptor rasterizer_state = {
+			.cull_mode = CGPU_CULL_MODE_NONE,
+		};
+		ECGPUPrimitiveTopology prim_topology = CGPU_PRIM_TOPO_TRI_LIST;
+		if (primType == HGEPRIM_QUADS)
+			prim_topology = CGPU_PRIM_TOPO_TRI_STRIP;
+		else if (primType == HGEPRIM_TRIPLES)
+			prim_topology = CGPU_PRIM_TOPO_TRI_LIST;
+		else if (primType == HGEPRIM_LINES)
+			prim_topology = CGPU_PRIM_TOPO_LINE_LIST;
+		CGPURenderPipelineDescriptor rp_desc = {
+			.root_signature = default_shader_root_sig,
+			.vertex_shader = &default_shader[0],
+			.fragment_shader = &default_shader[1],
+			.vertex_layout = &vertex_layout,
+			.blend_state = &blend_state,
+			.depth_state = &depth_state,
+			.rasterizer_state = &rasterizer_state,
+			.render_pass = render_pass,
+			.subpass = 0,
+			.render_target_count = 1,
+			.prim_topology = prim_topology,
+		};
+		auto pipeline = cgpu_create_render_pipeline(device, &rp_desc);
+		default_shader_pipelines.insert({ key, pipeline });
+
+		return pipeline;
+	}
 }

@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include "cgpu/api.h"
 #include <vector>
+#include <unordered_map>
 
 #define DEMO
 
@@ -289,7 +290,7 @@ public:
 	CGPUBufferId pIB;
 	CGPUShaderEntryDescriptor default_shader[2];
 	CGPURootSignatureId default_shader_root_sig;
-	CGPURenderPipelineId default_pipeline;
+	std::unordered_map<uint32_t, CGPURenderPipelineId> default_shader_pipelines;
 
 	CTextureList*		textures;
 	hgeVertex*			VertArray;
@@ -298,6 +299,7 @@ public:
 	int					CurPrimType;
 	int					CurBlendMode;
 	HTEXTURE			CurTexture;
+	CGPURenderPipelineId CurDefaultShaderPipeline;
 
 	bool				_GfxInit();
 	void				_GfxDone();
@@ -309,6 +311,7 @@ public:
 	void				_SetBlendMode(int blend);
 	void				_SetProjectionMatrix(int width, int height);
 	CGPUCommandBufferId	_RequestCmd(PerFrameData &frame_data);
+	CGPURenderPipelineId _RequestPipeline(int primType);
 
 	// Audio
 	HINSTANCE			hBass;
