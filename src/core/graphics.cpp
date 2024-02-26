@@ -524,7 +524,7 @@ void HGE_Impl::_render_batch(bool bEndScene)
 					cgpu_render_encoder_bind_pipeline(cur_rp_encoder, pipeline);
 					CurDefaultShaderPipeline = pipeline;
 				}
-				auto descriptor_set = _RequestDescriptorSet(CurTexture, true);
+				auto descriptor_set = _RequestDescriptorSet(CurTexture, bTextureFilter);
 				if (descriptor_set != CurDefaultDescriptorSet)
 				{
 					cgpu_render_encoder_bind_descriptor_set(cur_rp_encoder, descriptor_set);
@@ -745,17 +745,29 @@ bool HGE_Impl::_GfxInit()
 	};
 	default_shader_root_sig = cgpu_create_root_signature(device, &default_rs_desc);
 
-	CGPUSamplerDescriptor sampler_desc = {
+	CGPUSamplerDescriptor linear_sampler_desc = {
 		.min_filter = CGPU_FILTER_TYPE_LINEAR,
 		.mag_filter = CGPU_FILTER_TYPE_LINEAR,
-		.mipmap_mode = CGPU_MIPMAP_MODE_LINEAR,
+		.mipmap_mode = CGPU_MIPMAP_MODE_NEAREST,
 		.address_u = CGPU_ADDRESS_MODE_REPEAT,
 		.address_v = CGPU_ADDRESS_MODE_REPEAT,
 		.address_w = CGPU_ADDRESS_MODE_REPEAT,
 		.mip_lod_bias = 0,
 		.max_anisotropy = 1,
 	};
-	sampler = cgpu_create_sampler(device, &sampler_desc);
+	linear_sampler = cgpu_create_sampler(device, &linear_sampler_desc);
+
+	CGPUSamplerDescriptor point_sampler_desc = {
+		.min_filter = CGPU_FILTER_TYPE_NEAREST,
+		.mag_filter = CGPU_FILTER_TYPE_NEAREST,
+		.mipmap_mode = CGPU_MIPMAP_MODE_NEAREST,
+		.address_u = CGPU_ADDRESS_MODE_REPEAT,
+		.address_v = CGPU_ADDRESS_MODE_REPEAT,
+		.address_w = CGPU_ADDRESS_MODE_REPEAT,
+		.mip_lod_bias = 0,
+		.max_anisotropy = 1,
+	};
+	point_sampler = cgpu_create_sampler(device, &point_sampler_desc);
 
 	return true;
 }
@@ -828,8 +840,11 @@ void HGE_Impl::_GfxDone()
 	}
 	swapchain_infos.clear();
 
-	cgpu_free_sampler(sampler);
-	sampler = CGPU_NULLPTR;
+	cgpu_free_sampler(linear_sampler);
+	linear_sampler = CGPU_NULLPTR;
+
+	cgpu_free_sampler(point_sampler);
+	point_sampler = CGPU_NULLPTR;
 
 	if (pVB)
 		cgpu_free_buffer(pVB);
@@ -980,9 +995,9 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType)
 	}
 }
 
-CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool bilinear_sampler)
+CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear)
 {
-	DescriptorSetKey key = { .tex = tex, .sampler = bilinear_sampler };
+	DescriptorSetKey key = { .tex = tex, .sampler = linear };
 	auto iter = default_shader_descriptor_sets.find(key);
 	if (iter != default_shader_descriptor_sets.end())
 	{
@@ -997,6 +1012,7 @@ CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool bilinear_
 		auto descriptor_set = cgpu_create_descriptor_set(device, &set_desc);
 
 		CGPUTextureViewId texture_view = (CGPUTextureViewId)tex;
+		CGPUSamplerId sampler = linear ? linear_sampler : point_sampler;
 
 		CGPUDescriptorData datas[2];
 		datas[0] = {

@@ -310,7 +310,7 @@ public:
 	CGPURootSignatureId default_shader_root_sig;
 	std::unordered_map<uint32_t, CGPURenderPipelineId> default_shader_pipelines;
 	std::unordered_map<DescriptorSetKey, CGPUDescriptorSetId, DescriptorSetKeyHash> default_shader_descriptor_sets;
-	CGPUSamplerId sampler;
+	CGPUSamplerId linear_sampler, point_sampler;
 
 	CTextureList*		textures;
 	hgeVertex*			VertArray;
