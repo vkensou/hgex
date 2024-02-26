@@ -81,6 +81,23 @@ struct PerFrameData
 	CGPUDescriptorSetId last_descriptor_set{ CGPU_NULLPTR };
 };
 
+struct DescriptorSetKey
+{
+	HTEXTURE tex;
+	bool sampler;
+
+	bool operator==(const DescriptorSetKey& other) const {
+		return tex == other.tex && sampler == other.sampler;
+	}
+};
+
+struct DescriptorSetKeyHash
+{
+	std::size_t operator()(const DescriptorSetKey& k) const {
+		return std::hash<uintptr_t>()(k.tex) ^ (std::hash<bool>()(k.sampler) << 1);
+	}
+};
+
 void DInit();
 void DDone();
 bool DFrame();
@@ -292,6 +309,7 @@ public:
 	CGPUShaderEntryDescriptor default_shader[2];
 	CGPURootSignatureId default_shader_root_sig;
 	std::unordered_map<uint32_t, CGPURenderPipelineId> default_shader_pipelines;
+	std::unordered_map<DescriptorSetKey, CGPUDescriptorSetId, DescriptorSetKeyHash> default_shader_descriptor_sets;
 	CGPUSamplerId sampler;
 
 	CTextureList*		textures;
@@ -302,6 +320,7 @@ public:
 	int					CurBlendMode;
 	HTEXTURE			CurTexture;
 	CGPURenderPipelineId CurDefaultShaderPipeline;
+	CGPUDescriptorSetId CurDefaultDescriptorSet;
 
 	bool				_GfxInit();
 	void				_GfxDone();
@@ -314,6 +333,7 @@ public:
 	void				_SetProjectionMatrix(int width, int height);
 	CGPUCommandBufferId	_RequestCmd(PerFrameData &frame_data);
 	CGPURenderPipelineId _RequestPipeline(int primType);
+	CGPUDescriptorSetId _RequestDescriptorSet(HTEXTURE tex, bool sampler);
 
 	// Audio
 	HINSTANCE			hBass;

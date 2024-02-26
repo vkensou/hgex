@@ -133,6 +133,7 @@ bool CALL HGE_Impl::Gfx_BeginScene(HTARGET targ)
 	nPrim = 0;
 	CurPrimType = 0;
 	CurDefaultShaderPipeline = CGPU_NULLPTR;
+	CurDefaultDescriptorSet = CGPU_NULLPTR;
 
 	cgpu_reset_command_pool(cur_frame_data.pool);
 
@@ -251,7 +252,6 @@ void CALL HGE_Impl::Gfx_RenderTriple(const hgeTriple *triple)
 			CurPrimType = HGEPRIM_TRIPLES;
 			if (CurBlendMode != triple->blend) _SetBlendMode(triple->blend);
 			if (triple->tex != CurTexture) {
-				//pD3DDevice->SetTexture(0, (LPDIRECT3DTEXTURE9)triple->tex);
 				CurTexture = triple->tex;
 			}
 		}
@@ -273,7 +273,6 @@ void CALL HGE_Impl::Gfx_RenderQuad(const hgeQuad *quad)
 			if (CurBlendMode != quad->blend) _SetBlendMode(quad->blend);
 			if (quad->tex != CurTexture)
 			{
-				//pD3DDevice->SetTexture(0, (LPDIRECT3DTEXTURE9)quad->tex);
 				CurTexture = quad->tex;
 			}
 		}
@@ -524,6 +523,12 @@ void HGE_Impl::_render_batch(bool bEndScene)
 				{
 					cgpu_render_encoder_bind_pipeline(cur_rp_encoder, pipeline);
 					CurDefaultShaderPipeline = pipeline;
+				}
+				auto descriptor_set = _RequestDescriptorSet(CurTexture, true);
+				if (descriptor_set != CurDefaultDescriptorSet)
+				{
+					cgpu_render_encoder_bind_descriptor_set(cur_rp_encoder, descriptor_set);
+					CurDefaultDescriptorSet = descriptor_set;
 				}
 				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &pVB, &vert_stride, CGPU_NULLPTR);
 				cgpu_render_encoder_draw(cur_rp_encoder, eaten, (VertArray - pVB->info->cpu_mapped_address) / vert_stride);
@@ -840,6 +845,11 @@ void HGE_Impl::_GfxDone()
 	}
 	default_shader_pipelines.clear();
 
+	for (auto [_, descriptor_set] : default_shader_descriptor_sets)
+	{
+		cgpu_free_descriptor_set(descriptor_set);
+	}
+
 	cgpu_free_root_signature(default_shader_root_sig);
 	cgpu_free_shader_library(default_shader[0].library);
 	cgpu_free_shader_library(default_shader[1].library);
@@ -967,5 +977,43 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType)
 		default_shader_pipelines.insert({ key, pipeline });
 
 		return pipeline;
+	}
+}
+
+CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool bilinear_sampler)
+{
+	DescriptorSetKey key = { .tex = tex, .sampler = bilinear_sampler };
+	auto iter = default_shader_descriptor_sets.find(key);
+	if (iter != default_shader_descriptor_sets.end())
+	{
+		return iter->second;
+	}
+	else
+	{
+		CGPUDescriptorSetDescriptor set_desc = {
+			.root_signature = default_shader_root_sig,
+			.set_index = 0,
+		};
+		auto descriptor_set = cgpu_create_descriptor_set(device, &set_desc);
+
+		CGPUTextureViewId texture_view = (CGPUTextureViewId)tex;
+
+		CGPUDescriptorData datas[2];
+		datas[0] = {
+			.binding = 0,
+			.binding_type = CGPU_RESOURCE_TYPE_TEXTURE,
+			.textures = &texture_view,
+			.count = 1,
+		};
+		datas[1] = {
+			.binding = 1,
+			.binding_type = CGPU_RESOURCE_TYPE_SAMPLER,
+			.samplers = &sampler,
+			.count = 1,
+		};
+
+		cgpu_update_descriptor_set(descriptor_set, datas, 2);
+
+		return descriptor_set;
 	}
 }
