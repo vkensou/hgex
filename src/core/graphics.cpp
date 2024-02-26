@@ -716,8 +716,13 @@ bool HGE_Impl::_GfxInit()
 
 	cgpu_unmap_buffer(pIB);
 
-#include "hge.vert.spv.txt"
-#include "hge.frag.spv.txt"
+	uint8_t hge_vert_spv[] = {
+#include "hge.vs.spv.h"
+	};
+
+	uint8_t hge_frag_spv[] = {
+#include "hge.ps.spv.h"
+	};
 
 	CGPUShaderLibraryDescriptor vs_desc = {
 		.name = u8"VertexShaderLibrary",

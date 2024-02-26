@@ -37,7 +37,8 @@ target("hgex")
     add_packages("minizip")
     add_packages("cgpu")
     add_packages("freeimage")
-    
+    add_rules("utils.hlsl2spv", {bin2c = true})
+
     add_defines("HGEDLL")
 
     if (is_os("windows")) then
@@ -60,6 +61,7 @@ target("hgex")
     add_includedirs("include", {public = true})
     add_headerfiles("include/hge.h")
     add_files("src/core/*.cpp")
+    add_files("src/core/*.hlsl")
 
 target("hgexhelpers")
     set_kind("static")
