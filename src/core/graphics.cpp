@@ -9,6 +9,7 @@
 
 #include "hge_impl.h"
 #include "FreeImage.h"
+#include "glm/gtc/matrix_transform.hpp"
 
 void hge_graphicslog(void* user_data, ECGPULogSeverity severity, const char* fmt, ...)
 {
@@ -121,7 +122,21 @@ void CALL HGE_Impl::Gfx_SetClipping(int x, int y, int w, int h)
 
 void CALL HGE_Impl::Gfx_SetTransform(float x, float y, float dx, float dy, float rot, float hscale, float vscale)
 {
+	_render_batch();
 
+	if (vscale == 0.0f) matView = glm::identity<glm::mat4>();
+	else
+	{
+		matView = glm::translate(glm::mat4(), glm::vec3(- x, -y, 0.0f));
+		auto tmp = glm::scale(glm::mat4(), glm::vec3(hscale, vscale, 1.0f));
+		matView = matView * tmp;
+		tmp = glm::rotate(glm::mat4(), -rot, glm::vec3(0.0f, 0.0f, 1));
+		matView = matView * tmp;
+		tmp = glm::translate(glm::mat4(), glm::vec3(x + dx, y + dy, 0.0f));
+		matView = matView * tmp;
+	}
+
+	// TODO
 }
 
 bool CALL HGE_Impl::Gfx_BeginScene(HTARGET targ)
@@ -537,6 +552,7 @@ void HGE_Impl::_render_batch(bool bEndScene)
 					cgpu_render_encoder_bind_descriptor_set(cur_rp_encoder, descriptor_set);
 					CurDefaultDescriptorSet = descriptor_set;
 				}
+				cgpu_render_encoder_bind_descriptor_set(cur_rp_encoder, per_frame_ubo_descriptor_set);
 				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &pVB, &vert_stride, CGPU_NULLPTR);
 				cgpu_render_encoder_draw(cur_rp_encoder, eaten, (VertArray - pVB->info->cpu_mapped_address) / vert_stride);
 			}
@@ -555,6 +571,8 @@ void HGE_Impl::_SetBlendMode(int blend)
 
 void HGE_Impl::_SetProjectionMatrix(int width, int height)
 {
+	matProj = glm::orthoLH(0.0f, (float)width, 0.0f, (float)height, 0.0f, 1.0f);
+	//matProj[1][1] *= -1;
 }
 
 bool HGE_Impl::_GfxInit()
@@ -707,8 +725,8 @@ bool HGE_Impl::_GfxInit()
 		return false;
 	}
 
-	CGPUBufferRange range = { .offset = 0, .size = ib_size };
-	cgpu_map_buffer(pIB, &range);
+	CGPUBufferRange ib_range = { .offset = 0, .size = ib_size };
+	cgpu_map_buffer(pIB, &ib_range);
 
 	WORD* pIndices = (WORD*)pIB->info->cpu_mapped_address, n = 0;
 	for (int i = 0; i < VERTEX_BUFFER_SIZE / 4; i++) {
@@ -780,6 +798,44 @@ bool HGE_Impl::_GfxInit()
 		.max_anisotropy = 1,
 	};
 	point_sampler = cgpu_create_sampler(device, &point_sampler_desc);
+
+	CGPUBufferDescriptor per_frame_ubo_desc = {
+		.size = sizeof(PerFrameUBOData),
+		.name = u8"pVB",
+		.descriptors = CGPU_RESOURCE_TYPE_UNIFORM_BUFFER,
+		.memory_usage = CGPU_MEM_USAGE_GPU_ONLY,
+		.flags = CGPU_BCF_HOST_VISIBLE,
+		.start_state = CGPU_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+	};
+	per_frame_ubo = cgpu_create_buffer(device, &per_frame_ubo_desc);
+
+	CGPUDescriptorSetDescriptor per_frame_ubo_set_desc = {
+		.root_signature = default_shader_root_sig,
+		.set_index = 1,
+	};
+	per_frame_ubo_descriptor_set = cgpu_create_descriptor_set(device, &per_frame_ubo_set_desc);
+
+	_SetProjectionMatrix(nScreenWidth, nScreenHeight);
+	matView = glm::mat4(1);
+
+	CGPUBufferRange per_frame_ubo_range = { .offset = 0, .size = sizeof(PerFrameUBOData) };
+	cgpu_map_buffer(per_frame_ubo, &per_frame_ubo_range);
+	PerFrameUBOData ubo_data = {
+		.matProj = matProj,
+		.matView = matView,
+	};
+	*((PerFrameUBOData*)per_frame_ubo->info->cpu_mapped_address) = ubo_data;
+	cgpu_unmap_buffer(per_frame_ubo);
+
+	CGPUDescriptorData datas[1];
+	datas[0] = {
+		.binding = 0,
+		.binding_type = CGPU_RESOURCE_TYPE_BUFFER,
+		.buffers = &per_frame_ubo,
+		.count = 1,
+	};
+
+	cgpu_update_descriptor_set(per_frame_ubo_descriptor_set, datas, 1);
 
 	return true;
 }
@@ -894,7 +950,11 @@ void HGE_Impl::_GfxDone()
 	}
 	deleted_textures.clear();
 
+	cgpu_free_buffer(per_frame_ubo);
+	per_frame_ubo = CGPU_NULLPTR;
 
+	cgpu_free_descriptor_set(per_frame_ubo_descriptor_set);
+	per_frame_ubo_descriptor_set = CGPU_NULLPTR;
 
 	// for (auto shader : deleted_shaders)
 	// 	deleteShaderImpl(shader);

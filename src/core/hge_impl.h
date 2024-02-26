@@ -15,6 +15,7 @@
 #include "cgpu/api.h"
 #include <vector>
 #include <unordered_map>
+#include "glm/mat4x4.hpp"
 
 #define DEMO
 
@@ -79,6 +80,12 @@ struct PerFrameData
 	std::vector<CGPUCommandBufferId> allocated_cmds;
 	std::vector<CGPUDescriptorSetId> allocated_descriptor_sets;
 	CGPUDescriptorSetId last_descriptor_set{ CGPU_NULLPTR };
+};
+
+struct PerFrameUBOData
+{
+	glm::mat4 matProj;
+	glm::mat4 matView;
 };
 
 struct DescriptorSetKey
@@ -312,6 +319,11 @@ public:
 	std::unordered_map<DescriptorSetKey, CGPUDescriptorSetId, DescriptorSetKeyHash> default_shader_descriptor_sets;
 	CGPUSamplerId linear_sampler, point_sampler;
 	std::vector<std::tuple<CGPUTextureId, CGPUTextureViewId>> deleted_textures;
+	CGPUBufferId per_frame_ubo;
+	CGPUDescriptorSetId per_frame_ubo_descriptor_set;
+
+	glm::mat4			matView;
+	glm::mat4			matProj;
 
 	CTextureList*		textures;
 	hgeVertex*			VertArray;
