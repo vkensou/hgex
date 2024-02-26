@@ -353,10 +353,17 @@ HTEXTURE CALL HGE_Impl::Texture_Load(const char *filename, DWORD size, bool bMip
 		return NULL;
 	}
 	auto png = FreeImage_LoadFromMemory(fiformat, memory, PNG_DEFAULT);
+	uint32_t bpp = FreeImage_GetBPP(png);
+	if (bpp != 32)
+	{
+		auto prev_png = png;
+		png = FreeImage_ConvertTo32Bits(prev_png);
+		FreeImage_Unload(prev_png);
+	}
+	bpp = FreeImage_GetBPP(png);
 	uint32_t width = FreeImage_GetWidth(png);
 	uint32_t height = FreeImage_GetHeight(png);
 	auto type = FreeImage_GetImageType(png);
-	uint32_t bpp = FreeImage_GetBPP(png);
 	uint32_t pitch = FreeImage_GetPitch(png);
 	auto bits = (uint8_t*)FreeImage_GetBits(png);
 	//SwizzleFIBitmapDataToRGBA32(bits, width, height, pitch);
