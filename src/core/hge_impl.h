@@ -311,6 +311,7 @@ public:
 	std::unordered_map<uint32_t, CGPURenderPipelineId> default_shader_pipelines;
 	std::unordered_map<DescriptorSetKey, CGPUDescriptorSetId, DescriptorSetKeyHash> default_shader_descriptor_sets;
 	CGPUSamplerId linear_sampler, point_sampler;
+	std::vector<std::tuple<CGPUTextureId, CGPUTextureViewId>> deleted_textures;
 
 	CTextureList*		textures;
 	hgeVertex*			VertArray;
@@ -334,6 +335,7 @@ public:
 	CGPUCommandBufferId	_RequestCmd(PerFrameData &frame_data);
 	CGPURenderPipelineId _RequestPipeline(int primType);
 	CGPUDescriptorSetId _RequestDescriptorSet(HTEXTURE tex, bool sampler);
+	void				_DeleteDescriptorSet(HTEXTURE tex);
 
 	// Audio
 	HINSTANCE			hBass;

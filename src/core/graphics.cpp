@@ -129,6 +129,14 @@ bool CALL HGE_Impl::Gfx_BeginScene(HTARGET targ)
 	auto &cur_frame_data = frame_datas[current_frame_index];
 	cgpu_wait_fences(&cur_frame_data.inflight_fence, 1);
 
+	for (auto [texture, texture_view] : deleted_textures)
+	{
+		_DeleteDescriptorSet((HTEXTURE)texture_view);
+		cgpu_free_texture_view(texture_view);
+		cgpu_free_texture(texture);
+	}
+	deleted_textures.clear();
+
 	prepared = false;
 	nPrim = 0;
 	CurPrimType = 0;
@@ -458,14 +466,13 @@ void CALL HGE_Impl::Texture_Free(HTEXTURE tex)
 			texture = texItem->tex;
 			if (texPrev) texPrev->next = texItem->next;
 			else textures = texItem->next;
+			deleted_textures.push_back(std::make_tuple(texItem->tex, texItem->tex_view));
 			delete texItem;
 			break;
 		}
 		texPrev = texItem;
 		texItem = texItem->next;
 	}
-	if (texture_view) cgpu_free_texture_view(texture_view);
-	if (texture) cgpu_free_texture(texture);
 }
 
 int CALL HGE_Impl::Texture_GetWidth(HTEXTURE tex, bool bOriginal)
@@ -809,6 +816,9 @@ void HGE_Impl::_Resize(int width, int height)
 
 void HGE_Impl::_GfxDone()
 {
+	while (textures)	
+		Texture_Free((HTEXTURE)textures->tex_view);
+
 	cgpu_wait_queue_idle(gfx_queue);
 	cgpu_wait_queue_idle(present_queue);
 
@@ -876,6 +886,15 @@ void HGE_Impl::_GfxDone()
 
 	default_shader_root_sig = CGPU_NULLPTR;
 	memset(default_shader, 0, 2 * sizeof(CGPUShaderEntryDescriptor));
+
+	for (auto [texture, texture_view] : deleted_textures)
+	{
+		cgpu_free_texture_view(texture_view);
+		cgpu_free_texture(texture);
+	}
+	deleted_textures.clear();
+
+
 
 	// for (auto shader : deleted_shaders)
 	// 	deleteShaderImpl(shader);
@@ -1036,5 +1055,28 @@ CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear)
 		cgpu_update_descriptor_set(descriptor_set, datas, 2);
 
 		return descriptor_set;
+	}
+}
+
+void HGE_Impl::_DeleteDescriptorSet(HTEXTURE tex)
+{
+	{
+		DescriptorSetKey key = { .tex = tex, .sampler = true };
+		auto iter = default_shader_descriptor_sets.find(key);
+		if (iter != default_shader_descriptor_sets.end())
+		{
+			cgpu_free_descriptor_set(iter->second);
+			default_shader_descriptor_sets.erase(iter);
+		}
+	}
+
+	{
+		DescriptorSetKey key = { .tex = tex, .sampler = false };
+		auto iter = default_shader_descriptor_sets.find(key);
+		if (iter != default_shader_descriptor_sets.end())
+		{
+			cgpu_free_descriptor_set(iter->second);
+			default_shader_descriptor_sets.erase(iter);
+		}
 	}
 }
