@@ -48,8 +48,8 @@ hgeSprite::hgeSprite(HTEXTURE texture, float texx, float texy, float w, float h)
 
 	quad.v[0].tx = texx1; quad.v[0].ty = texy1;
 	quad.v[1].tx = texx2; quad.v[1].ty = texy1;
-	quad.v[2].tx = texx1; quad.v[2].ty = texy2;
-	quad.v[3].tx = texx2; quad.v[3].ty = texy2;
+	quad.v[2].tx = texx2; quad.v[2].ty = texy2;
+	quad.v[3].tx = texx1; quad.v[3].ty = texy2;
 
 	quad.v[0].z = 
 	quad.v[1].z = 
@@ -81,8 +81,8 @@ void hgeSprite::Render(float x, float y)
 
 	quad.v[0].x = tempx1; quad.v[0].y = tempy1;
 	quad.v[1].x = tempx2; quad.v[1].y = tempy1;
-	quad.v[2].x = tempx1; quad.v[2].y = tempy2;
-	quad.v[3].x = tempx2; quad.v[3].y = tempy2;
+	quad.v[2].x = tempx2; quad.v[2].y = tempy2;
+	quad.v[3].x = tempx1; quad.v[3].y = tempy2;
 
 	hge->Gfx_RenderQuad(&quad);
 }
