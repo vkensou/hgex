@@ -492,12 +492,26 @@ void CALL HGE_Impl::Texture_Free(HTEXTURE tex)
 
 int CALL HGE_Impl::Texture_GetWidth(HTEXTURE tex, bool bOriginal)
 {
+	CTextureList* texItem = textures;
+
+	while (texItem)
+	{
+		if (texItem->tex_view == (CGPUTextureViewId)tex) return  texItem->tex->info->width;
+		texItem = texItem->next;
+	}
 	return 0;
 }
 
 
 int CALL HGE_Impl::Texture_GetHeight(HTEXTURE tex, bool bOriginal)
 {
+	CTextureList* texItem = textures;
+
+	while (texItem)
+	{
+		if (texItem->tex_view == (CGPUTextureViewId)tex) return  texItem->tex->info->height;
+		texItem = texItem->next;
+	}
 	return 0;
 }
 
