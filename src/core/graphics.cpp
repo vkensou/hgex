@@ -1187,7 +1187,7 @@ CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear, b
 	auto texItem = (CTextureList*)tex;
 	if (!texItem)
 		return CGPU_NULLPTR;
-	DescriptorSetKey key = { .tex = texItem, .sampler = linear };
+	DescriptorSetKey key = { .tex = texItem, .sampler = linear, .color = color };
 	auto iter = default_shader_descriptor_sets.find(key);
 	if (iter != default_shader_descriptor_sets.end())
 	{
