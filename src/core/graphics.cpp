@@ -289,9 +289,9 @@ void CALL HGE_Impl::Gfx_RenderQuad(const hgeQuad *quad)
 {
 	if (VertArray)
 	{
-		_render_batch();
 		if (CurPrimType != HGEPRIM_QUADS || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_QUADS || CurTexture != quad->tex || CurBlendMode != quad->blend)
 		{
+			_render_batch();
 
 			CurPrimType = HGEPRIM_QUADS;
 			if (CurBlendMode != quad->blend) _SetBlendMode(quad->blend);
@@ -559,7 +559,11 @@ void HGE_Impl::_render_batch(bool bEndScene)
 				}
 				cgpu_render_encoder_bind_descriptor_set(cur_rp_encoder, per_frame_ubo_descriptor_set);
 				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &pVB, &vert_stride, CGPU_NULLPTR);
-				cgpu_render_encoder_draw(cur_rp_encoder, eaten, VertArray - pVB->info->cpu_mapped_address);
+				cgpu_render_encoder_bind_index_buffer(cur_rp_encoder, pIB, sizeof(WORD), 0);
+				if (CurPrimType == HGEPRIM_QUADS)
+					cgpu_render_encoder_draw_indexed(cur_rp_encoder, nPrim * 6, (VertArray - pVB->info->cpu_mapped_address) / 4 * 6, VertArray - pVB->info->cpu_mapped_address);
+				else
+					cgpu_render_encoder_draw(cur_rp_encoder, eaten, VertArray - pVB->info->cpu_mapped_address);
 			}
 
 			nPrim = 0;
@@ -1063,7 +1067,7 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType)
 		};
 		ECGPUPrimitiveTopology prim_topology = CGPU_PRIM_TOPO_TRI_LIST;
 		if (primType == HGEPRIM_QUADS)
-			prim_topology = CGPU_PRIM_TOPO_TRI_STRIP;
+			prim_topology = CGPU_PRIM_TOPO_TRI_LIST;
 		else if (primType == HGEPRIM_TRIPLES)
 			prim_topology = CGPU_PRIM_TOPO_TRI_LIST;
 		else if (primType == HGEPRIM_LINES)
