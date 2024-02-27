@@ -1030,7 +1030,7 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType)
 			.attribute_count = 3,
 			.attributes = {
 				{ u8"POSITION", 1, CGPU_FORMAT_R32G32B32_SFLOAT, 0, 0, sizeof(float) * 3, CGPU_INPUT_RATE_VERTEX },
-				{ u8"COLOR", 1, CGPU_FORMAT_R32_UINT, 0, sizeof(float) * 3, sizeof(uint32_t), CGPU_INPUT_RATE_VERTEX },
+				{ u8"COLOR", 1, CGPU_FORMAT_R8G8B8A8_UNORM, 0, sizeof(float) * 3, sizeof(uint32_t), CGPU_INPUT_RATE_VERTEX },
 				{ u8"TEXCOORD0", 1, CGPU_FORMAT_R32G32_SFLOAT, 0, sizeof(float) * 3 + sizeof(uint32_t), sizeof(float) * 2, CGPU_INPUT_RATE_VERTEX },
 			}
 		};
