@@ -44,7 +44,7 @@ target("hgex")
     add_defines("HGEDLL")
 
     if (is_os("windows")) then
-        add_syslinks("user32", "shell32", "gdi32", "winmm")
+        add_syslinks("user32", "shell32", "gdi32", "winmm", "advapi32")
     end
 
     if (is_os("windows")) then
