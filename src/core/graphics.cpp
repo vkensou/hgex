@@ -460,59 +460,43 @@ HTEXTURE CALL HGE_Impl::Texture_Load(const char *filename, DWORD size, bool bMip
 	texItem = new CTextureList;
 	texItem->tex = texture;
 	texItem->tex_view = texture_view;
-	texItem->width = texture->info->width;
-	texItem->height = texture->info->height;
 	texItem->next = textures;
 	textures = texItem;
 
-	return (HTEXTURE)texture_view;
+	return (HTEXTURE)texItem;
 }
 
 void CALL HGE_Impl::Texture_Free(HTEXTURE tex)
 {
-	CGPUTextureId texture;
-	CGPUTextureViewId texture_view = (CGPUTextureViewId)tex;
-	CTextureList* texItem = textures, * texPrev = 0;
+	CTextureList* pTextures = textures, * texPrev = 0;
+	auto texItem = (CTextureList*)tex;
 
-	while (texItem)
+	while (pTextures)
 	{
-		if (texItem->tex_view == texture_view)
+		if (pTextures == texItem)
 		{
-			texture = texItem->tex;
-			if (texPrev) texPrev->next = texItem->next;
-			else textures = texItem->next;
-			deleted_textures.push_back(std::make_tuple(texItem->tex, texItem->tex_view));
-			delete texItem;
+			if (texPrev) texPrev->next = pTextures->next;
+			else textures = pTextures->next;
+			deleted_textures.push_back(std::make_tuple(pTextures->tex, pTextures->tex_view));
+			delete pTextures;
 			break;
 		}
-		texPrev = texItem;
-		texItem = texItem->next;
+		texPrev = pTextures;
+		pTextures = pTextures->next;
 	}
 }
 
 int CALL HGE_Impl::Texture_GetWidth(HTEXTURE tex, bool bOriginal)
 {
-	CTextureList* texItem = textures;
-
-	while (texItem)
-	{
-		if (texItem->tex_view == (CGPUTextureViewId)tex) return  texItem->tex->info->width;
-		texItem = texItem->next;
-	}
-	return 0;
+	auto texItem = (CTextureList*)tex;
+	return texItem->tex->info->width;
 }
 
 
 int CALL HGE_Impl::Texture_GetHeight(HTEXTURE tex, bool bOriginal)
 {
-	CTextureList* texItem = textures;
-
-	while (texItem)
-	{
-		if (texItem->tex_view == (CGPUTextureViewId)tex) return  texItem->tex->info->height;
-		texItem = texItem->next;
-	}
-	return 0;
+	auto texItem = (CTextureList*)tex;
+	return texItem->tex->info->height;
 }
 
 
@@ -1098,7 +1082,8 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType)
 
 CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear)
 {
-	DescriptorSetKey key = { .tex = tex, .sampler = linear };
+	auto texItem = (CTextureList*)tex;
+	DescriptorSetKey key = { .tex = texItem, .sampler = linear };
 	auto iter = default_shader_descriptor_sets.find(key);
 	if (iter != default_shader_descriptor_sets.end())
 	{
@@ -1112,7 +1097,7 @@ CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear)
 		};
 		auto descriptor_set = cgpu_create_descriptor_set(device, &set_desc);
 
-		CGPUTextureViewId texture_view = (CGPUTextureViewId)tex;
+		CGPUTextureViewId texture_view = texItem->tex_view;
 		CGPUSamplerId sampler = linear ? linear_sampler : point_sampler;
 
 		CGPUDescriptorData datas[2];
@@ -1137,8 +1122,9 @@ CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear)
 
 void HGE_Impl::_DeleteDescriptorSet(HTEXTURE tex)
 {
+	auto texItem = (CTextureList*)tex;
 	{
-		DescriptorSetKey key = { .tex = tex, .sampler = true };
+		DescriptorSetKey key = { .tex = texItem, .sampler = true };
 		auto iter = default_shader_descriptor_sets.find(key);
 		if (iter != default_shader_descriptor_sets.end())
 		{
@@ -1148,7 +1134,7 @@ void HGE_Impl::_DeleteDescriptorSet(HTEXTURE tex)
 	}
 
 	{
-		DescriptorSetKey key = { .tex = tex, .sampler = false };
+		DescriptorSetKey key = { .tex = texItem, .sampler = false };
 		auto iter = default_shader_descriptor_sets.find(key);
 		if (iter != default_shader_descriptor_sets.end())
 		{

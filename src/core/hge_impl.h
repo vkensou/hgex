@@ -39,8 +39,6 @@ struct CTextureList
 {
 	CGPUTextureId		tex;
 	CGPUTextureViewId	tex_view;
-	int					width;
-	int					height;
 	CTextureList*		next;
 };
 
@@ -90,7 +88,7 @@ struct PerFrameUBOData
 
 struct DescriptorSetKey
 {
-	HTEXTURE tex;
+	CTextureList* tex;
 	bool sampler;
 
 	bool operator==(const DescriptorSetKey& other) const {
@@ -101,7 +99,7 @@ struct DescriptorSetKey
 struct DescriptorSetKeyHash
 {
 	std::size_t operator()(const DescriptorSetKey& k) const {
-		return std::hash<uintptr_t>()(k.tex) ^ (std::hash<bool>()(k.sampler) << 1);
+		return std::hash<void*>()(k.tex) ^ (std::hash<bool>()(k.sampler) << 1);
 	}
 };
 
