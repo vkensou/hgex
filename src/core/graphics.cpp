@@ -365,10 +365,10 @@ HTEXTURE CALL HGE_Impl::Texture_Load(const char *filename, DWORD size, bool bMip
 		if (!data) return NULL;
 	}
 
-	FIMEMORY* memory = FreeImage_OpenMemory((BYTE*)data, size);
+	FIMEMORY* memory = FreeImage_OpenMemory((BYTE*)data, _size);
 	if (!memory)
 		return NULL;
-	auto fiformat = FreeImage_GetFileTypeFromMemory(memory, size);
+	auto fiformat = FreeImage_GetFileTypeFromMemory(memory, _size);
 	if (fiformat == FIF_UNKNOWN)
 	{
 		FreeImage_CloseMemory(memory);
@@ -489,14 +489,20 @@ void CALL HGE_Impl::Texture_Free(HTEXTURE tex)
 int CALL HGE_Impl::Texture_GetWidth(HTEXTURE tex, bool bOriginal)
 {
 	auto texItem = (CTextureList*)tex;
-	return texItem->tex->info->width;
+	if (texItem)
+		return texItem->tex->info->width;
+	else
+		return 0;
 }
 
 
 int CALL HGE_Impl::Texture_GetHeight(HTEXTURE tex, bool bOriginal)
 {
 	auto texItem = (CTextureList*)tex;
-	return texItem->tex->info->height;
+	if (texItem)
+		return texItem->tex->info->height;
+	else
+		return 0;
 }
 
 
@@ -1083,6 +1089,8 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType)
 CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear)
 {
 	auto texItem = (CTextureList*)tex;
+	if (!texItem)
+		return CGPU_NULLPTR;
 	DescriptorSetKey key = { .tex = texItem, .sampler = linear };
 	auto iter = default_shader_descriptor_sets.find(key);
 	if (iter != default_shader_descriptor_sets.end())
@@ -1115,6 +1123,7 @@ CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear)
 		};
 
 		cgpu_update_descriptor_set(descriptor_set, datas, 2);
+		default_shader_descriptor_sets.insert({ key, descriptor_set });
 
 		return descriptor_set;
 	}
