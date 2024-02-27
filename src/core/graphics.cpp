@@ -557,19 +557,22 @@ void HGE_Impl::_render_batch(bool bEndScene)
 
 			if (eaten)
 			{
-				auto pipeline = _RequestPipeline(CurPrimType);
+				bool blend = (CurBlendMode & BLEND_ALPHABLEND) != 0;
+				bool color = (CurBlendMode & BLEND_COLORADD) != 0;
+
+				auto pipeline = _RequestPipeline(CurPrimType, blend, color);
 				if (pipeline != CurDefaultShaderPipeline)
 				{
 					cgpu_render_encoder_bind_pipeline(cur_rp_encoder, pipeline);
 					CurDefaultShaderPipeline = pipeline;
 				}
-				auto descriptor_set = _RequestDescriptorSet(CurTexture, bTextureFilter);
+				auto descriptor_set = _RequestDescriptorSet(CurTexture, bTextureFilter, color);
 				if (descriptor_set != CurDefaultDescriptorSet)
 				{
 					cgpu_render_encoder_bind_descriptor_set(cur_rp_encoder, descriptor_set);
 					CurDefaultDescriptorSet = descriptor_set;
 				}
-				cgpu_render_encoder_bind_descriptor_set(cur_rp_encoder, per_frame_ubo_descriptor_set);
+				cgpu_render_encoder_bind_descriptor_set(cur_rp_encoder, per_frame_ubo_descriptor_sets[color]);
 				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &pVB, &vert_stride, CGPU_NULLPTR);
 				cgpu_render_encoder_bind_index_buffer(cur_rp_encoder, pIB, sizeof(WORD), 0);
 				if (CurPrimType == HGEPRIM_QUADS)
@@ -767,35 +770,74 @@ bool HGE_Impl::_GfxInit()
 #include "hge.vs.spv.h"
 	};
 
-	uint8_t hge_frag_spv[] = {
-#include "hge.ps.spv.h"
+	uint8_t hge_color_mul_frag_spv[] = {
+#include "hge_color_mul.ps.spv.h"
 	};
 
-	CGPUShaderLibraryDescriptor vs_desc = {
+	uint8_t hge_color_add_frag_spv[] = {
+#include "hge_color_add.ps.spv.h"
+	};
+
+	CGPUShaderLibraryDescriptor vs_color_mul_desc = {
 		.name = u8"VertexShaderLibrary",
 		.code = reinterpret_cast<const uint32_t*>(hge_vert_spv),
 		.code_size = sizeof(hge_vert_spv),
 		.stage = CGPU_SHADER_STAGE_VERT,
 	};
-	CGPUShaderLibraryDescriptor ps_desc = {
+	CGPUShaderLibraryDescriptor ps_color_mul_desc = {
 		.name = u8"FragmentShaderLibrary",
-		.code = reinterpret_cast<const uint32_t*>(hge_frag_spv),
-		.code_size = sizeof(hge_frag_spv),
+		.code = reinterpret_cast<const uint32_t*>(hge_color_mul_frag_spv),
+		.code_size = sizeof(hge_color_mul_frag_spv),
 		.stage = CGPU_SHADER_STAGE_FRAG,
 	};
-	CGPUShaderLibraryId vertex_shader = cgpu_create_shader_library(device, &vs_desc);
-	CGPUShaderLibraryId fragment_shader = cgpu_create_shader_library(device, &ps_desc);
+	CGPUShaderLibraryDescriptor vs_color_add_desc = {
+		.name = u8"VertexShaderLibrary",
+		.code = reinterpret_cast<const uint32_t*>(hge_vert_spv),
+		.code_size = sizeof(hge_vert_spv),
+		.stage = CGPU_SHADER_STAGE_VERT,
+	};
+	CGPUShaderLibraryDescriptor ps_color_add_desc = {
+		.name = u8"FragmentShaderLibrary",
+		.code = reinterpret_cast<const uint32_t*>(hge_color_add_frag_spv),
+		.code_size = sizeof(hge_color_add_frag_spv),
+		.stage = CGPU_SHADER_STAGE_FRAG,
+	};
+	CGPUShaderLibraryId vertex_color_mul_shader = cgpu_create_shader_library(device, &vs_color_mul_desc);
+	CGPUShaderLibraryId fragment_color_mul_shader = cgpu_create_shader_library(device, &ps_color_mul_desc);
+	CGPUShaderLibraryId vertex_color_add_shader = cgpu_create_shader_library(device, &vs_color_add_desc);
+	CGPUShaderLibraryId fragment_color_add_shader = cgpu_create_shader_library(device, &ps_color_add_desc);
 	default_shader[0].stage = CGPU_SHADER_STAGE_VERT;
 	default_shader[0].entry = u8"main";
-	default_shader[0].library = vertex_shader;
+	default_shader[0].library = vertex_color_mul_shader;
 	default_shader[1].stage = CGPU_SHADER_STAGE_FRAG;
 	default_shader[1].entry = u8"main";
-	default_shader[1].library = fragment_shader;
-	CGPURootSignatureDescriptor default_rs_desc = {
-		.shaders = default_shader,
+	default_shader[1].library = fragment_color_mul_shader;
+	default_shader[2].stage = CGPU_SHADER_STAGE_VERT;
+	default_shader[2].entry = u8"main";
+	default_shader[2].library = vertex_color_add_shader;
+	default_shader[3].stage = CGPU_SHADER_STAGE_FRAG;
+	default_shader[3].entry = u8"main";
+	default_shader[3].library = fragment_color_add_shader;
+	CGPUShaderEntryDescriptor shader_color_mul[2] =
+	{
+		default_shader[0],
+		default_shader[1],
+	};
+	CGPURootSignatureDescriptor default_color_mul_rs_desc = {
+		.shaders = shader_color_mul,
 		.shader_count = 2
 	};
-	default_shader_root_sig = cgpu_create_root_signature(device, &default_rs_desc);
+	default_shader_root_sigs[0] = cgpu_create_root_signature(device, &default_color_mul_rs_desc);
+	CGPUShaderEntryDescriptor shader_color_add[2] =
+	{
+		default_shader[2],
+		default_shader[3],
+	};
+	CGPURootSignatureDescriptor default_color_add_rs_desc = {
+		.shaders = shader_color_add,
+		.shader_count = 2
+	};
+	default_shader_root_sigs[1] = cgpu_create_root_signature(device, &default_color_add_rs_desc);
 
 	CGPUSamplerDescriptor linear_sampler_desc = {
 		.min_filter = CGPU_FILTER_TYPE_LINEAR,
@@ -831,11 +873,17 @@ bool HGE_Impl::_GfxInit()
 	};
 	per_frame_ubo = cgpu_create_buffer(device, &per_frame_ubo_desc);
 
-	CGPUDescriptorSetDescriptor per_frame_ubo_set_desc = {
-		.root_signature = default_shader_root_sig,
+	CGPUDescriptorSetDescriptor per_frame_ubo_set_desc_0 = {
+		.root_signature = default_shader_root_sigs[0],
 		.set_index = 1,
 	};
-	per_frame_ubo_descriptor_set = cgpu_create_descriptor_set(device, &per_frame_ubo_set_desc);
+	per_frame_ubo_descriptor_sets[0] = cgpu_create_descriptor_set(device, &per_frame_ubo_set_desc_0);
+
+	CGPUDescriptorSetDescriptor per_frame_ubo_set_desc_1 = {
+		.root_signature = default_shader_root_sigs[1],
+		.set_index = 1,
+	};
+	per_frame_ubo_descriptor_sets[1] = cgpu_create_descriptor_set(device, &per_frame_ubo_set_desc_1);
 
 	_SetProjectionMatrix(nScreenWidth, nScreenHeight);
 	matView = glm::mat4(1);
@@ -857,7 +905,8 @@ bool HGE_Impl::_GfxInit()
 		.count = 1,
 	};
 
-	cgpu_update_descriptor_set(per_frame_ubo_descriptor_set, datas, 1);
+	cgpu_update_descriptor_set(per_frame_ubo_descriptor_sets[0], datas, 1);
+	cgpu_update_descriptor_set(per_frame_ubo_descriptor_sets[1], datas, 1);
 
 	return true;
 }
@@ -961,12 +1010,15 @@ void HGE_Impl::_GfxDone()
 		cgpu_free_descriptor_set(descriptor_set);
 	}
 
-	cgpu_free_root_signature(default_shader_root_sig);
+	cgpu_free_root_signature(default_shader_root_sigs[0]);
+	cgpu_free_root_signature(default_shader_root_sigs[1]);
 	cgpu_free_shader_library(default_shader[0].library);
 	cgpu_free_shader_library(default_shader[1].library);
+	cgpu_free_shader_library(default_shader[2].library);
+	cgpu_free_shader_library(default_shader[3].library);
 
-	default_shader_root_sig = CGPU_NULLPTR;
-	memset(default_shader, 0, 2 * sizeof(CGPUShaderEntryDescriptor));
+	memset(default_shader_root_sigs, 0, sizeof(default_shader_root_sigs));
+	memset(default_shader, 0, sizeof(default_shader));
 
 	for (auto [texture, texture_view] : deleted_textures)
 	{
@@ -978,8 +1030,9 @@ void HGE_Impl::_GfxDone()
 	cgpu_free_buffer(per_frame_ubo);
 	per_frame_ubo = CGPU_NULLPTR;
 
-	cgpu_free_descriptor_set(per_frame_ubo_descriptor_set);
-	per_frame_ubo_descriptor_set = CGPU_NULLPTR;
+	cgpu_free_descriptor_set(per_frame_ubo_descriptor_sets[0]);
+	cgpu_free_descriptor_set(per_frame_ubo_descriptor_sets[1]);
+	memset(default_shader_root_sigs, 0, sizeof(per_frame_ubo_descriptor_sets));
 
 	// for (auto shader : deleted_shaders)
 	// 	deleteShaderImpl(shader);
@@ -1037,11 +1090,25 @@ CGPUCommandBufferId HGE_Impl::_RequestCmd(PerFrameData &frame_data)
 	return cmd;
 }
 
-CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType)
+CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType, bool blend, bool color)
 {
-	uint32_t key = (0x3 & (primType - 1));
+	union
+	{
+		uint32_t value;
+		struct {
+			uint32_t primType : 2;
+			uint32_t blend : 1;
+			uint32_t color : 1;
+			uint32_t pad : 28;
+		} sep;
+	} key;
 
-	auto iter = default_shader_pipelines.find(key);
+	key.sep.primType = primType - 1;
+	key.sep.blend = blend;
+	key.sep.color = color;
+	key.sep.pad = 0;
+
+	auto iter = default_shader_pipelines.find(key.value);
 	if (iter != default_shader_pipelines.end())
 	{
 		return iter->second;
@@ -1058,9 +1125,20 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType)
 				{ u8"TEXCOORD0", 1, CGPU_FORMAT_R32G32_SFLOAT, 0, sizeof(float) * 3 + sizeof(uint32_t), sizeof(float) * 2, CGPU_INPUT_RATE_VERTEX },
 			}
 		};
-		CGPUBlendStateDescriptor blend_state = {
+		CGPUBlendStateDescriptor blend_blend_state = {
 			.src_factors = { CGPU_BLEND_CONST_SRC_ALPHA },
 			.dst_factors = { CGPU_BLEND_CONST_ONE_MINUS_SRC_ALPHA },
+			.src_alpha_factors = { CGPU_BLEND_CONST_ONE },
+			.dst_alpha_factors = { CGPU_BLEND_CONST_ZERO },
+			.blend_modes = { CGPU_BLEND_MODE_ADD },
+			.blend_alpha_modes = { CGPU_BLEND_MODE_ADD },
+			.masks = { CGPU_COLOR_MASK_ALL },
+			.alpha_to_coverage = false,
+			.independent_blend = false,
+		};
+		CGPUBlendStateDescriptor blend_add_state = {
+			.src_factors = { CGPU_BLEND_CONST_ONE },
+			.dst_factors = { CGPU_BLEND_CONST_ONE },
 			.src_alpha_factors = { CGPU_BLEND_CONST_ONE },
 			.dst_alpha_factors = { CGPU_BLEND_CONST_ZERO },
 			.blend_modes = { CGPU_BLEND_MODE_ADD },
@@ -1085,11 +1163,11 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType)
 		else if (primType == HGEPRIM_LINES)
 			prim_topology = CGPU_PRIM_TOPO_LINE_LIST;
 		CGPURenderPipelineDescriptor rp_desc = {
-			.root_signature = default_shader_root_sig,
-			.vertex_shader = &default_shader[0],
-			.fragment_shader = &default_shader[1],
+			.root_signature = default_shader_root_sigs[color],
+			.vertex_shader = &default_shader[color*2+0],
+			.fragment_shader = &default_shader[color*2+1],
 			.vertex_layout = &vertex_layout,
-			.blend_state = &blend_state,
+			.blend_state = blend ? &blend_blend_state : &blend_add_state,
 			.depth_state = &depth_state,
 			.rasterizer_state = &rasterizer_state,
 			.render_pass = render_pass,
@@ -1098,13 +1176,13 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType)
 			.prim_topology = prim_topology,
 		};
 		auto pipeline = cgpu_create_render_pipeline(device, &rp_desc);
-		default_shader_pipelines.insert({ key, pipeline });
+		default_shader_pipelines.insert({ key.value, pipeline });
 
 		return pipeline;
 	}
 }
 
-CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear)
+CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear, bool color)
 {
 	auto texItem = (CTextureList*)tex;
 	if (!texItem)
@@ -1118,7 +1196,7 @@ CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear)
 	else
 	{
 		CGPUDescriptorSetDescriptor set_desc = {
-			.root_signature = default_shader_root_sig,
+			.root_signature = default_shader_root_sigs[color],
 			.set_index = 0,
 		};
 		auto descriptor_set = cgpu_create_descriptor_set(device, &set_desc);

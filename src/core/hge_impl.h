@@ -90,16 +90,17 @@ struct DescriptorSetKey
 {
 	CTextureList* tex;
 	bool sampler;
+	bool color;
 
 	bool operator==(const DescriptorSetKey& other) const {
-		return tex == other.tex && sampler == other.sampler;
+		return tex == other.tex && sampler == other.sampler && color == other.color;
 	}
 };
 
 struct DescriptorSetKeyHash
 {
 	std::size_t operator()(const DescriptorSetKey& k) const {
-		return std::hash<void*>()(k.tex) ^ (std::hash<bool>()(k.sampler) << 1);
+		return ((std::hash<void*>()(k.tex) ^ (std::hash<bool>()(k.sampler) << 1)) << 1) ^ (std::hash<bool>()(k.color) << 1);
 	}
 };
 
@@ -311,14 +312,14 @@ public:
 	bool prepared;
 	CGPUBufferId pVB;
 	CGPUBufferId pIB;
-	CGPUShaderEntryDescriptor default_shader[2];
-	CGPURootSignatureId default_shader_root_sig;
+	CGPUShaderEntryDescriptor default_shader[4];
+	CGPURootSignatureId default_shader_root_sigs[2];
 	std::unordered_map<uint32_t, CGPURenderPipelineId> default_shader_pipelines;
 	std::unordered_map<DescriptorSetKey, CGPUDescriptorSetId, DescriptorSetKeyHash> default_shader_descriptor_sets;
 	CGPUSamplerId linear_sampler, point_sampler;
 	std::vector<std::tuple<CGPUTextureId, CGPUTextureViewId>> deleted_textures;
 	CGPUBufferId per_frame_ubo;
-	CGPUDescriptorSetId per_frame_ubo_descriptor_set;
+	CGPUDescriptorSetId per_frame_ubo_descriptor_sets[2];
 
 	glm::mat4			matView;
 	glm::mat4			matProj;
@@ -343,8 +344,8 @@ public:
 	void				_SetBlendMode(int blend);
 	void				_SetProjectionMatrix(int width, int height);
 	CGPUCommandBufferId	_RequestCmd(PerFrameData &frame_data);
-	CGPURenderPipelineId _RequestPipeline(int primType);
-	CGPUDescriptorSetId _RequestDescriptorSet(HTEXTURE tex, bool sampler);
+	CGPURenderPipelineId _RequestPipeline(int primType, bool blend, bool color);
+	CGPUDescriptorSetId _RequestDescriptorSet(HTEXTURE tex, bool sampler, bool color);
 	void				_DeleteDescriptorSet(HTEXTURE tex);
 
 	// Audio
