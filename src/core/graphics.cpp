@@ -157,6 +157,7 @@ bool CALL HGE_Impl::Gfx_BeginScene(HTARGET targ)
 	CurPrimType = 0;
 	CurDefaultShaderPipeline = CGPU_NULLPTR;
 	CurDefaultDescriptorSet = CGPU_NULLPTR;
+	CurBlendMode = 0;
 
 	cgpu_reset_command_pool(cur_frame_data.pool);
 
@@ -288,9 +289,9 @@ void CALL HGE_Impl::Gfx_RenderQuad(const hgeQuad *quad)
 {
 	if (VertArray)
 	{
+		_render_batch();
 		if (CurPrimType != HGEPRIM_QUADS || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_QUADS || CurTexture != quad->tex || CurBlendMode != quad->blend)
 		{
-			_render_batch();
 
 			CurPrimType = HGEPRIM_QUADS;
 			if (CurBlendMode != quad->blend) _SetBlendMode(quad->blend);
@@ -388,7 +389,7 @@ HTEXTURE CALL HGE_Impl::Texture_Load(const char *filename, DWORD size, bool bMip
 	auto type = FreeImage_GetImageType(png);
 	uint32_t pitch = FreeImage_GetPitch(png);
 	auto bits = (uint8_t*)FreeImage_GetBits(png);
-	//SwizzleFIBitmapDataToRGBA32(bits, width, height, pitch);
+	SwizzleFIBitmapDataToRGBA32(bits, width, height, pitch);
 
 	CGPUTextureDescriptor texture_desc =
 	{
@@ -558,7 +559,7 @@ void HGE_Impl::_render_batch(bool bEndScene)
 				}
 				cgpu_render_encoder_bind_descriptor_set(cur_rp_encoder, per_frame_ubo_descriptor_set);
 				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &pVB, &vert_stride, CGPU_NULLPTR);
-				cgpu_render_encoder_draw(cur_rp_encoder, eaten, (VertArray - pVB->info->cpu_mapped_address) / vert_stride);
+				cgpu_render_encoder_draw(cur_rp_encoder, eaten, VertArray - pVB->info->cpu_mapped_address);
 			}
 
 			nPrim = 0;
@@ -571,6 +572,7 @@ void HGE_Impl::_render_batch(bool bEndScene)
 
 void HGE_Impl::_SetBlendMode(int blend)
 {
+	CurBlendMode = blend;
 }
 
 void HGE_Impl::_SetProjectionMatrix(int width, int height)
