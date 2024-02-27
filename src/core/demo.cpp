@@ -171,15 +171,15 @@ void DInit() {
 		dquad.v[i].col=0xFFFFFFFF;
 	}
 
-	dquad.v[0].tx=0.0f; dquad.v[0].ty=1.0f;
-	dquad.v[1].tx=0.0f; dquad.v[1].ty=0.0f;
-	dquad.v[2].tx=1.0f; dquad.v[2].ty=1.0f;
-	dquad.v[3].tx=1.0f; dquad.v[3].ty=0.0f;
+	dquad.v[0].tx=0.0f; dquad.v[0].ty=0.0f;
+	dquad.v[1].tx=1.0f; dquad.v[1].ty=0.0f;
+	dquad.v[2].tx=0.0f; dquad.v[2].ty=1.0f;
+	dquad.v[3].tx=1.0f; dquad.v[3].ty=1.0f;
 
-	dquad.v[0].x=x-64.0f; dquad.v[0].y=y+64.0f;
-	dquad.v[1].x=x-64.0f; dquad.v[1].y=y-64.0f;
-	dquad.v[2].x=x+64.0f; dquad.v[2].y=y+64.0f;
-	dquad.v[3].x=x+64.0f; dquad.v[3].y=y-64.0f;
+	dquad.v[0].x=x-64.0f; dquad.v[0].y=y-64.0f;
+	dquad.v[1].x=x+64.0f; dquad.v[1].y=y-64.0f;
+	dquad.v[2].x=x-64.0f; dquad.v[2].y=y+64.0f;
+	dquad.v[3].x=x+64.0f; dquad.v[3].y=y+64.0f;
 
 	dtime=0.0f;
 }

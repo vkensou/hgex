@@ -63,10 +63,10 @@ bool FrameFunc()
 	if(y<16) {y=16+16-y;dy=-dy;boom();}
 
 	// Set up quad's screen coordinates
-	quad.v[0].x=x-16; quad.v[0].y=y+16;
-	quad.v[1].x=x-16; quad.v[1].y=y-16;
-	quad.v[2].x=x+16; quad.v[2].y=y+16;
-	quad.v[3].x=x+16; quad.v[3].y=y-16;
+	quad.v[0].x=x-16; quad.v[0].y=y-16;
+	quad.v[1].x=x+16; quad.v[1].y=y-16;
+	quad.v[2].x=x-16; quad.v[2].y=y+16;
+	quad.v[3].x=x+16; quad.v[3].y=y+16;
 
 	// Continue execution
 	return false;
@@ -141,12 +141,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		}
 
 		// Set up quad's texture coordinates.
-		// 0,0 means top left corner and 1,1 -
-		// bottom right corner of the texture.
-		quad.v[0].tx=96.0/128.0; quad.v[0].ty=64.0/128.0; 
-		quad.v[1].tx=96.0/128.0; quad.v[1].ty=32.0/128.0; 
-		quad.v[2].tx=128.0/128.0; quad.v[2].ty=64.0/128.0; 
-		quad.v[3].tx=128.0/128.0; quad.v[3].ty=32.0/128.0; 
+		// 0,0 means bottom left corner and 1,1 -
+		// bottom top corner of the texture.
+		quad.v[0].tx=96.0/128.0; quad.v[0].ty=32.0/128.0; 
+		quad.v[1].tx=128.0/128.0; quad.v[1].ty=32.0/128.0; 
+		quad.v[2].tx=96.0/128.0; quad.v[2].ty=64.0/128.0; 
+		quad.v[3].tx=128.0/128.0; quad.v[3].ty=64.0/128.0; 
 
 		// Let's rock now!
 		hge->System_Start();
