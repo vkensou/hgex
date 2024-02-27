@@ -23,8 +23,8 @@ hgeGUIMenuItem::hgeGUIMenuItem(int _id, hgeFont *_fnt, HEFFECT _snd, float _x, f
 	delay=_delay;
 	title=_title;
 
-	color.SetHWColor(0xFFFFE060);
-	shadow.SetHWColor(0x30000000);
+	color.SetHWColor(RGBA(0xFF,0xE0,0x60,0xFF));
+	shadow.SetHWColor(RGBA(0,0,0,0x30));
 	offset=0.0f;
 	timer=-1.0f;
 	timer2=-1.0f;
@@ -89,8 +89,8 @@ void hgeGUIMenuItem::Enter()
 {
 	hgeColor tcolor2;
 
-	scolor2.SetHWColor(0x00FFE060);
-	tcolor2.SetHWColor(0xFFFFE060);
+	scolor2.SetHWColor(RGBA(0xFF,0xE0,0x60,0x00));
+	tcolor2.SetHWColor(RGBA(0xFF,0xE0,0x60,0xFF));
 	dcolor2=tcolor2-scolor2;
 
 	sshadow.SetHWColor(0x00000000);
@@ -106,8 +106,8 @@ void hgeGUIMenuItem::Leave()
 {
 	hgeColor tcolor2;
 
-	scolor2.SetHWColor(0xFFFFE060);
-	tcolor2.SetHWColor(0x00FFE060);
+	scolor2.SetHWColor(RGBA(0xFF,0xE0,0x60,0xFF));
+	tcolor2.SetHWColor(RGBA(0xFF,0xE0,0x60,0x00));
 	dcolor2=tcolor2-scolor2;
 
 	sshadow.SetHWColor(0x30000000);
@@ -134,7 +134,7 @@ void hgeGUIMenuItem::Focus(bool bFocused)
 	if(bFocused)
 	{
 		hge->Effect_Play(snd);
-		scolor.SetHWColor(0xFFFFE060);
+		scolor.SetHWColor(RGBA(0xFF,0xE0,0x60,0xFF));
 		tcolor.SetHWColor(0xFFFFFFFF);
 		soffset=0;
 		doffset=4;
@@ -142,7 +142,7 @@ void hgeGUIMenuItem::Focus(bool bFocused)
 	else
 	{
 		scolor.SetHWColor(0xFFFFFFFF);
-		tcolor.SetHWColor(0xFFFFE060);
+		tcolor.SetHWColor(RGBA(0xFF,0xE0,0x60,0xFF));
 		soffset=4;
 		doffset=-4;
 	}
