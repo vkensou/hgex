@@ -79,7 +79,7 @@ bool FrameFunc()
 					{
 						dis->SetDisplacement(j,i,cosf(t*5+j/2)*15,0,HGEDISP_NODE);
 						col=int((cosf(t*5+(i+j)/2)+1)*35);
-						dis->SetColor(j,i,0xFF<<24 | col<<16 | col<<8 | col);
+						dis->SetColor(j,i,RGBA(col,col,col,0xFF));
 					}
 				break;
 
@@ -92,7 +92,7 @@ bool FrameFunc()
 						dy=cosf(a)*(i*cellh-256)-sinf(a)*(j*cellw-256);
 						dis->SetDisplacement(j,i,dx,dy,HGEDISP_CENTER);
 						col=int((cos(r+t*4)+1)*40);
-						dis->SetColor(j,i,0xFF<<24 | col<<16 | (col/2)<<8);
+						dis->SetColor(j,i,RGBA(col,col/2,0,0xFF));
 					}
 					break;
 	}
