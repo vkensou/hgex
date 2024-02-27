@@ -564,7 +564,7 @@ void HGE_Impl::_render_batch(bool bEndScene)
 				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &pVB, &vert_stride, CGPU_NULLPTR);
 				cgpu_render_encoder_bind_index_buffer(cur_rp_encoder, pIB, sizeof(WORD), 0);
 				if (CurPrimType == HGEPRIM_QUADS)
-					cgpu_render_encoder_draw_indexed(cur_rp_encoder, nPrim * 6, (VertArray - pVB->info->cpu_mapped_address) / 4 * 6, VertArray - pVB->info->cpu_mapped_address);
+					cgpu_render_encoder_draw_indexed(cur_rp_encoder, nPrim * 6, (VertArray - pVB->info->cpu_mapped_address) / 4 * 6, 0);
 				else
 					cgpu_render_encoder_draw(cur_rp_encoder, eaten, VertArray - pVB->info->cpu_mapped_address);
 			}
