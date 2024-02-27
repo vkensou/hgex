@@ -424,7 +424,10 @@ HTEXTURE CALL HGE_Impl::Texture_Load(const char *filename, DWORD size, bool bMip
 	upload_buffer_desc.size = pitch * height;
 	CGPUBufferId tex_upload_buffer = cgpu_create_buffer(device, &upload_buffer_desc);
 	{
-		memcpy(tex_upload_buffer->info->cpu_mapped_address, bits, pitch * height);
+		for (size_t i = 0; i < height; ++i)
+		{
+			memcpy((uint8_t*)tex_upload_buffer->info->cpu_mapped_address + (height - i - 1) * pitch, bits + i * pitch, pitch);
+		}
 	}
 	auto cpy_cmd_pool = cgpu_create_command_pool(gfx_queue, &cmd_pool_desc);
 	auto cpy_cmd = cgpu_create_command_buffer(cpy_cmd_pool, &cmd_desc);
@@ -581,7 +584,7 @@ void HGE_Impl::_SetBlendMode(int blend)
 
 void HGE_Impl::_SetProjectionMatrix(int width, int height)
 {
-	matProj = glm::orthoLH(0.0f, (float)width, 0.0f, (float)height, 0.0f, 1.0f);
+	matProj = glm::orthoLH(0.0f, (float)width, (float)height, 0.0f, 0.0f, 1.0f);
 	//matProj[1][1] *= -1;
 }
 

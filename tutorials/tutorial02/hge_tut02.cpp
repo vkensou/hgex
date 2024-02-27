@@ -52,8 +52,8 @@ bool FrameFunc()
 	if (hge->Input_GetKeyState(HGEK_ESCAPE)) return true;
 	if (hge->Input_GetKeyState(HGEK_LEFT)) dx-=speed*dt;
 	if (hge->Input_GetKeyState(HGEK_RIGHT)) dx+=speed*dt;
-	if (hge->Input_GetKeyState(HGEK_UP)) dy+=speed*dt;
-	if (hge->Input_GetKeyState(HGEK_DOWN)) dy-=speed*dt;
+	if (hge->Input_GetKeyState(HGEK_UP)) dy-=speed*dt;
+	if (hge->Input_GetKeyState(HGEK_DOWN)) dy+=speed*dt;
 
 	// Do some movement calculations and collision detection	
 	dx*=friction; dy*=friction; x+=dx; y+=dy;
@@ -141,12 +141,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		}
 
 		// Set up quad's texture coordinates.
-		// 0,0 means bottom left corner and 1,1 -
-		// top right corner of the texture.
-		quad.v[0].tx=96.0/128.0; quad.v[0].ty=32.0/128.0; 
-		quad.v[1].tx=128.0/128.0; quad.v[1].ty=32.0/128.0; 
-		quad.v[2].tx=128.0/128.0; quad.v[2].ty=64.0/128.0; 
-		quad.v[3].tx=96.0/128.0; quad.v[3].ty=64.0/128.0; 
+		// 0,0 means top left corner and 1,1 -
+		// bottom right corner of the texture.
+		quad.v[0].tx=96.0/128.0; quad.v[0].ty=64.0/128.0; 
+		quad.v[1].tx=128.0/128.0; quad.v[1].ty=64.0/128.0; 
+		quad.v[2].tx=128.0/128.0; quad.v[2].ty=96.0/128.0; 
+		quad.v[3].tx=96.0/128.0; quad.v[3].ty=96.0/128.0; 
 
 		// Let's rock now!
 		hge->System_Start();
