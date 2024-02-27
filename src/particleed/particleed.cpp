@@ -70,8 +70,8 @@ bool RenderFunc()
 
 	// Render
 	
-	hge->Gfx_Clear(0);
 	hge->Gfx_BeginScene();
+	hge->Gfx_Clear(0);
 
 	if(state.sprBG)	state.sprBG->Render(400, 300);
 
@@ -85,10 +85,10 @@ bool RenderFunc()
 
 	if(state.bIFace)
 	{
-		sprLeftPane1->Render(0,0);
-		sprLeftPane2->Render(0,512);
-		sprRightPane1->Render(632,0);
-		sprRightPane2->Render(632,512);
+		sprLeftPane1->Render(0,88);
+		sprLeftPane2->Render(0,0);
+		sprRightPane1->Render(632,88);
+		sprRightPane2->Render(632,0);
 		
 		gui->Render();
 		sprParticles->SetColor(state.ps->info.colColorStart.GetHWColor() | 0xFF000000);
@@ -160,8 +160,11 @@ void InitEditor()
 		state.texBG = hge->Texture_Load(bgName);
 		bgw = hge->Texture_GetWidth(state.texBG, true);
 		bgh = hge->Texture_GetHeight(state.texBG, true);
-		state.sprBG = new hgeSprite(state.texBG, 0, 0, (float)bgw, (float)bgh);
-		state.sprBG->SetHotSpot((float)bgw/2, (float)bgh/2);
+		if (state.texBG)
+		{
+			state.sprBG = new hgeSprite(state.texBG, 0, 0, (float)bgw, (float)bgh);
+			state.sprBG->SetHotSpot((float)bgw / 2, (float)bgh / 2);
+		}
 	}
 
 	hge->Resource_AttachPack("particleed.paq");
@@ -188,9 +191,9 @@ void InitEditor()
 	sprBBox=new hgeSprite(texGui, 337, 209, 128, 128);
 
 	sprLeftPane1=new hgeSprite(texGui, 0, 0, 168, 512);
-	sprLeftPane2=new hgeSprite(texGui, 336, 0, 168, 88);
+	sprLeftPane2=new hgeSprite(texGui, 336, 424, 168, 88);
 	sprRightPane1=new hgeSprite(texGui, 168, 0, 168, 512);
-	sprRightPane2=new hgeSprite(texGui, 336, 88, 168, 88);
+	sprRightPane2=new hgeSprite(texGui, 336, 336, 168, 88);
 
 	gui=new hgeGUI();
 	CreateGUI();
