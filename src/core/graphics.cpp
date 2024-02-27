@@ -918,7 +918,10 @@ void HGE_Impl::_GfxDone()
 	point_sampler = CGPU_NULLPTR;
 
 	if (pVB)
+	{
+		cgpu_unmap_buffer(pVB);
 		cgpu_free_buffer(pVB);
+	}
 	pVB = CGPU_NULLPTR;
 
 	if (pIB)
