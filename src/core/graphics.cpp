@@ -238,6 +238,9 @@ void CALL HGE_Impl::Gfx_EndScene()
 
 void CALL HGE_Impl::Gfx_RenderLine(float x1, float y1, float x2, float y2, DWORD color, float z)
 {
+	if (!prepared)
+		Gfx_Clear(0);
+
 	if (VertArray)
 	{
 		if (CurPrimType != HGEPRIM_LINES || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_LINES || CurTexture || CurBlendMode != BLEND_DEFAULT)
@@ -267,6 +270,9 @@ void CALL HGE_Impl::Gfx_RenderLine(float x1, float y1, float x2, float y2, DWORD
 
 void CALL HGE_Impl::Gfx_RenderTriple(const hgeTriple *triple)
 {
+	if (!prepared)
+		Gfx_Clear(0);
+
 	if (VertArray)
 	{
 		if (CurPrimType != HGEPRIM_TRIPLES || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_TRIPLES || CurTexture != triple->tex || CurBlendMode != triple->blend)
@@ -287,6 +293,9 @@ void CALL HGE_Impl::Gfx_RenderTriple(const hgeTriple *triple)
 
 void CALL HGE_Impl::Gfx_RenderQuad(const hgeQuad *quad)
 {
+	if (!prepared)
+		Gfx_Clear(0);
+
 	if (VertArray)
 	{
 		if (CurPrimType != HGEPRIM_QUADS || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_QUADS || CurTexture != quad->tex || CurBlendMode != quad->blend)
