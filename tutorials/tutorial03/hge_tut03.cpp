@@ -121,7 +121,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 		// Create and set up a sprite
 		spr=new hgeSprite(tex, 96, 64, 32, 32);
-		spr->SetColor(0xFFFFA000);
+		spr->SetColor(0xFF00A0FF);
 		spr->SetHotSpot(16,16);
 
 		// Load a font
