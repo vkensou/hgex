@@ -1137,7 +1137,7 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType, bool blend, bool c
 			.independent_blend = false,
 		};
 		CGPUBlendStateDescriptor blend_add_state = {
-			.src_factors = { CGPU_BLEND_CONST_ONE },
+			.src_factors = { CGPU_BLEND_CONST_SRC_ALPHA },
 			.dst_factors = { CGPU_BLEND_CONST_ONE },
 			.src_alpha_factors = { CGPU_BLEND_CONST_ONE },
 			.dst_alpha_factors = { CGPU_BLEND_CONST_ZERO },
