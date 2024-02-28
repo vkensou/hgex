@@ -41,10 +41,10 @@ hgeFont		*fnt=0;
 #define STARS_HEIGHT	(SKY_HEIGHT*0.9f)
 #define ORBITS_RADIUS	(SCREEN_WIDTH*0.43f)
 
-DWORD skyTopColors[] = {0xFF15092A, 0xFF6C6480, 0xFF89B9D0};
-DWORD skyBtmColors[] = {0xFF303E57, 0xFFAC7963, 0xFFCAD7DB};
-DWORD seaTopColors[] = {0xFF3D546B, 0xFF927E76, 0xFF86A2AD};
-DWORD seaBtmColors[] = {0xFF1E394C, 0xFF2F4E64, 0xFF2F4E64};
+DWORD skyTopColors[] = {ARGB(0xFF,0x15,0x09,0x2A), ARGB(0xFF,0x6C,0x64,0x80), ARGB(0xFF,0x89,0xB9,0xD0)};
+DWORD skyBtmColors[] = {ARGB(0xFF,0x30,0x3E,0x57), ARGB(0xFF,0xAC,0x79,0x63), ARGB(0xFF,0xCA,0xD7,0xDB)};
+DWORD seaTopColors[] = {ARGB(0xFF,0x3D,0x54,0x6B), ARGB(0xFF,0x92,0x7E,0x76), ARGB(0xFF,0x86,0xA2,0xAD)};
+DWORD seaBtmColors[] = {ARGB(0xFF,0x1E,0x39,0x4C), ARGB(0xFF,0x2F,0x4E,0x64), ARGB(0xFF,0x2F,0x4E,0x64)};
 
 int seq[]={0, 0, 1, 2, 2, 2, 1, 0, 0};
 
@@ -239,7 +239,7 @@ bool InitSimulation()
 
 	// Initialize simulation state
 
-	colWhite.SetHWColor(0xFFFFFFFF);
+	colWhite.SetHWColor(ARGB(0xFF,0xFF,0xFF,0xFF));
 	time=GetTime();
 	speed=0.0f;
 
@@ -339,7 +339,7 @@ void UpdateSimulation()
 	else if(seq_id>2 && seq_id<5) a=1.0f;
 	else a=0.0f;
 	
-	colSun.SetHWColor(0xFFEAE1BE);
+	colSun.SetHWColor(ARGB(0xFF,0xEA,0xE1,0xBE));
 	colSun=colSun*(1-a)+colWhite*a;
 
 	a=(cosf(time/6.0f*M_PI)+1.0f)/2.0f;
@@ -348,7 +348,7 @@ void UpdateSimulation()
 		colSunGlow=colWhite*a;
 		colSunGlow.a=1.0f;
 	}
-	else colSunGlow.SetHWColor(0xFF000000);
+	else colSunGlow.SetHWColor(ARGB(0xFF,0x00,0x00,0x00));
 
 	sunX=SCREEN_WIDTH*0.5f+cosf(zenith)*ORBITS_RADIUS;
 	sunY=SKY_HEIGHT*1.2f+sinf(zenith)*ORBITS_RADIUS;
@@ -359,7 +359,7 @@ void UpdateSimulation()
 
 	if(seq_id>=6) a=sinf((time-18.0f)/6.0f*M_PI_2);
 	else a=sinf((1.0f-time/6.0f)*M_PI_2);
-	colMoon.SetHWColor(0x20FFFFFF);
+	colMoon.SetHWColor(ARGB(0x20,0xFF,0xFF,0xFF));
 	colMoon=colMoon*(1-a)+colWhite*a;
 
 	colMoonGlow=colWhite;
@@ -489,7 +489,7 @@ void RenderSimulation()
 	if(seq_id>=6 || seq_id<2)
 		for(int i=0; i<NUM_STARS; i++)
 		{
-			star->SetColor((DWORD(starA[i]*255.0f)<<24) | 0xFFFFFF);
+			star->SetColor(ARGB(starA[i]*255.0f,0xFF,0xFF,0xFF));
 			star->RenderEx(starX[i], starY[i], 0.0f, starS[i]);
 		}
 

@@ -137,7 +137,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			// Set up z-coordinate of vertices
 			quad.v[i].z=0.5f;
 			// Set up color. The format of DWORD col is 0xAABBGGRR
-			quad.v[i].col=0xFF00A0FF;
+			quad.v[i].col=ARGB(0xFF,0xFF,0xA0,0x00);
 		}
 
 		// Set up quad's texture coordinates.

@@ -101,7 +101,7 @@ bool RenderFunc()
 	hge->Gfx_Clear(0);
 	for(i=0;i<6;i++)
 	{
-		tar->SetColor(0xFFFFFF | (((5-i)*40+55)<<24));
+		tar->SetColor(ARGB(((5-i)*40+55),0xFF,0xFF,0xFF));
 		tar->RenderEx(i*100.0f, i*50.0f, i*M_PI/8, 1.0f-i*0.1f);
 	}
 	fnt->printf(5, 5, HGETEXT_LEFT, "dt:%.3f\nFPS:%d (constant)", hge->Timer_GetDelta(), hge->Timer_GetFPS());
@@ -143,7 +143,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		}
 
 		spr=new hgeSprite(tex, 96, 64, 32, 32);
-		spr->SetColor(0xFFFFA000);
+		spr->SetColor(ARGB(0xFF,0xFF,0xA0,0x00));
 		spr->SetHotSpot(16,16);
 
 		fnt=new hgeFont("font1.fnt");

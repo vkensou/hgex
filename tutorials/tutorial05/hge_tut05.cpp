@@ -60,7 +60,7 @@ bool FrameFunc()
 
 		case HGEK_SPACE:
 			if(++trans > 2) trans=0;
-			dis->Clear(0xFF000000);
+			dis->Clear(ARGB(0xFF,0x00,0x00,0x00));
 			break;
 	}
 	
@@ -79,7 +79,7 @@ bool FrameFunc()
 					{
 						dis->SetDisplacement(j,i,cosf(t*5+j/2)*15,0,HGEDISP_NODE);
 						col=int((cosf(t*5+(i+j)/2)+1)*35);
-						dis->SetColor(j,i,RGBA(col,col,col,0xFF));
+						dis->SetColor(j,i,ARGB(0xFF,col,col,col));
 					}
 				break;
 
@@ -92,7 +92,7 @@ bool FrameFunc()
 						dy=cosf(a)*(i*cellh-256)-sinf(a)*(j*cellw-256);
 						dis->SetDisplacement(j,i,dx,dy,HGEDISP_CENTER);
 						col=int((cos(r+t*4)+1)*40);
-						dis->SetColor(j,i,RGBA(col,col/2,0,0xFF));
+						dis->SetColor(j,i,ARGB(0xFF,col,(col/2),0));
 					}
 					break;
 	}
@@ -147,7 +147,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		dis->SetTexture(tex);
 		dis->SetTextureRect(0,0,512,512);
 		dis->SetBlendMode(BLEND_COLORADD | BLEND_ALPHABLEND | BLEND_ZWRITE);
-		dis->Clear(0xFF000000);
+		dis->Clear(ARGB(0xFF,0x00,0x00,0x00));
 
 		// Load a font
 		fnt=new hgeFont("font1.fnt");
