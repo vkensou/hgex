@@ -343,7 +343,37 @@ HTEXTURE CALL HGE_Impl::Target_GetTexture(HTARGET target)
 
 HTEXTURE CALL HGE_Impl::Texture_Create(int width, int height)
 {
-	return 0;
+	CGPUTextureDescriptor texture_desc =
+	{
+		.width = (uint64_t)width,
+		.height = (uint64_t)height,
+		.depth = 1,
+		.array_size = 1,
+		.format = CGPU_FORMAT_R8G8B8A8_SRGB,
+		.mip_levels = 1,
+		.owner_queue = gfx_queue,
+		.start_state = CGPU_RESOURCE_STATE_COPY_DEST,
+		.descriptors = CGPU_RESOURCE_TYPE_TEXTURE,
+	};
+
+	auto texture = cgpu_create_texture(device, &texture_desc);
+
+	CGPUTextureViewDescriptor view_desc = {
+		.texture = texture,
+		.format = texture->info->format,
+		.usages = CGPU_TVU_SRV,
+		.aspects = CGPU_TVA_COLOR,
+	};
+	auto texture_view = cgpu_create_texture_view(device, &view_desc);
+
+	auto texItem = new CTextureList;
+	texItem->tex = texture;
+	texItem->tex_view = texture_view;
+	texItem->locked = NULL;
+	texItem->next = textures;
+	textures = texItem;
+
+	return (HTEXTURE)texItem;
 }
 
 static void SwizzleFIBitmapDataToRGBA32(uint8_t* bits, int width, int height, int pitch)
@@ -401,81 +431,17 @@ HTEXTURE CALL HGE_Impl::Texture_Load(const char *filename, DWORD size, bool bMip
 	auto bits = (uint8_t*)FreeImage_GetBits(png);
 	SwizzleFIBitmapDataToRGBA32(bits, width, height, pitch);
 
-	CGPUTextureDescriptor texture_desc =
+	texItem = (CTextureList*)Texture_Create(width, height);
+
+	auto locked = (uint8_t*)Texture_Lock((HTEXTURE)texItem);
+	for (size_t i = 0; i < height; ++i)
 	{
-		.width = (uint64_t)width,
-		.height = (uint64_t)height,
-		.depth = 1,
-		.array_size = 1,
-		.format = CGPU_FORMAT_R8G8B8A8_SRGB,
-		.mip_levels = 1,
-		.owner_queue = gfx_queue,
-		.start_state = CGPU_RESOURCE_STATE_COPY_DEST,
-		.descriptors = CGPU_RESOURCE_TYPE_TEXTURE,
-	};
-
-	auto texture = cgpu_create_texture(device, &texture_desc);
-
-	CGPUTextureViewDescriptor view_desc = {
-		.texture = texture,
-		.format = texture->info->format,
-		.usages = CGPU_TVU_SRV,
-		.aspects = CGPU_TVA_COLOR,
-	};
-	auto texture_view = cgpu_create_texture_view(device, &view_desc);
-
-	CGPUCommandPoolDescriptor cmd_pool_desc = {};
-	CGPUCommandBufferDescriptor cmd_desc = {};
-	CGPUBufferDescriptor upload_buffer_desc = {};
-	upload_buffer_desc.name = u8"UploadBuffer";
-	upload_buffer_desc.flags = CGPU_BCF_PERSISTENT_MAP_BIT;
-	upload_buffer_desc.descriptors = CGPU_RESOURCE_TYPE_NONE;
-	upload_buffer_desc.memory_usage = CGPU_MEM_USAGE_CPU_ONLY;
-	upload_buffer_desc.size = pitch * height;
-	CGPUBufferId tex_upload_buffer = cgpu_create_buffer(device, &upload_buffer_desc);
-	{
-		for (size_t i = 0; i < height; ++i)
-		{
-			memcpy((uint8_t*)tex_upload_buffer->info->cpu_mapped_address + (height - i - 1) * pitch, bits + i * pitch, pitch);
-		}
+		memcpy((uint8_t*)locked + i * pitch, bits + i * pitch, pitch);
 	}
-	auto cpy_cmd_pool = cgpu_create_command_pool(gfx_queue, &cmd_pool_desc);
-	auto cpy_cmd = cgpu_create_command_buffer(cpy_cmd_pool, &cmd_desc);
-	cgpu_cmd_begin(cpy_cmd);
-	CGPUBufferToTextureTransfer b2t = {};
-	b2t.src = tex_upload_buffer;
-	b2t.src_offset = 0;
-	b2t.dst = texture;
-	b2t.dst_subresource.mip_level = 0;
-	b2t.dst_subresource.base_array_layer = 0;
-	b2t.dst_subresource.layer_count = 1;
-	cgpu_cmd_transfer_buffer_to_texture(cpy_cmd, &b2t);
-	CGPUTextureBarrier srv_barrier = {};
-	srv_barrier.texture = texture;
-	srv_barrier.src_state = CGPU_RESOURCE_STATE_COPY_DEST;
-	srv_barrier.dst_state = CGPU_RESOURCE_STATE_SHADER_RESOURCE;
-	CGPUResourceBarrierDescriptor barrier_desc1 = {};
-	barrier_desc1.texture_barriers = &srv_barrier;
-	barrier_desc1.texture_barriers_count = 1;
-	cgpu_cmd_resource_barrier(cpy_cmd, &barrier_desc1);
-	cgpu_cmd_end(cpy_cmd);
-	CGPUQueueSubmitDescriptor cpy_submit = {};
-	cpy_submit.cmds = &cpy_cmd;
-	cpy_submit.cmds_count = 1;
-	cgpu_submit_queue(gfx_queue, &cpy_submit);
-	cgpu_wait_queue_idle(gfx_queue);
-	cgpu_free_command_buffer(cpy_cmd);
-	cgpu_free_command_pool(cpy_cmd_pool);
-	cgpu_free_buffer(tex_upload_buffer);
+	Texture_Unlock((HTEXTURE)texItem);
 
 	FreeImage_CloseMemory(memory);
 	if (!size) Resource_Free(data);
-
-	texItem = new CTextureList;
-	texItem->tex = texture;
-	texItem->tex_view = texture_view;
-	texItem->next = textures;
-	textures = texItem;
 
 	return (HTEXTURE)texItem;
 }
@@ -492,6 +458,7 @@ void CALL HGE_Impl::Texture_Free(HTEXTURE tex)
 			if (texPrev) texPrev->next = pTextures->next;
 			else textures = pTextures->next;
 			deleted_textures.push_back(std::make_tuple(pTextures->tex, pTextures->tex_view));
+			if (pTextures->locked) free(pTextures->locked);
 			delete pTextures;
 			break;
 		}
@@ -522,13 +489,71 @@ int CALL HGE_Impl::Texture_GetHeight(HTEXTURE tex, bool bOriginal)
 
 DWORD * CALL HGE_Impl::Texture_Lock(HTEXTURE tex, bool bReadOnly, int left, int top, int width, int height)
 {
-	return 0;
-}
+	auto texItem = (CTextureList*)tex;
+	if (!texItem->locked)
+	{
+		texItem->locked = (uint8_t*)malloc(texItem->tex->info->width * texItem->tex->info->height * 4);
+	}
 
+	return (DWORD*)texItem->locked;
+}
 
 void CALL HGE_Impl::Texture_Unlock(HTEXTURE tex)
 {
+	auto texItem = (CTextureList*)tex;
+	if (!texItem->locked)
+		return;
 
+	uint32_t width = texItem->tex->info->width;
+	uint32_t height = texItem->tex->info->height;
+	uint32_t bpp = 4;
+	uint32_t pitch = width * bpp;
+	CGPUCommandPoolDescriptor cmd_pool_desc = {};
+	CGPUCommandBufferDescriptor cmd_desc = {};
+	CGPUBufferDescriptor upload_buffer_desc = {};
+	upload_buffer_desc.name = u8"UploadBuffer";
+	upload_buffer_desc.flags = CGPU_BCF_PERSISTENT_MAP_BIT;
+	upload_buffer_desc.descriptors = CGPU_RESOURCE_TYPE_NONE;
+	upload_buffer_desc.memory_usage = CGPU_MEM_USAGE_CPU_ONLY;
+	upload_buffer_desc.size = pitch * height;
+	CGPUBufferId tex_upload_buffer = cgpu_create_buffer(device, &upload_buffer_desc);
+	{
+		for (size_t i = 0; i < height; ++i)
+		{
+			memcpy((uint8_t*)tex_upload_buffer->info->cpu_mapped_address + (height - i - 1) * pitch, texItem->locked + i * pitch, pitch);
+		}
+	}
+	auto cpy_cmd_pool = cgpu_create_command_pool(gfx_queue, &cmd_pool_desc);
+	auto cpy_cmd = cgpu_create_command_buffer(cpy_cmd_pool, &cmd_desc);
+	cgpu_cmd_begin(cpy_cmd);
+	CGPUBufferToTextureTransfer b2t = {};
+	b2t.src = tex_upload_buffer;
+	b2t.src_offset = 0;
+	b2t.dst = texItem->tex;
+	b2t.dst_subresource.mip_level = 0;
+	b2t.dst_subresource.base_array_layer = 0;
+	b2t.dst_subresource.layer_count = 1;
+	cgpu_cmd_transfer_buffer_to_texture(cpy_cmd, &b2t);
+	CGPUTextureBarrier srv_barrier = {};
+	srv_barrier.texture = texItem->tex;
+	srv_barrier.src_state = CGPU_RESOURCE_STATE_COPY_DEST;
+	srv_barrier.dst_state = CGPU_RESOURCE_STATE_SHADER_RESOURCE;
+	CGPUResourceBarrierDescriptor barrier_desc1 = {};
+	barrier_desc1.texture_barriers = &srv_barrier;
+	barrier_desc1.texture_barriers_count = 1;
+	cgpu_cmd_resource_barrier(cpy_cmd, &barrier_desc1);
+	cgpu_cmd_end(cpy_cmd);
+	CGPUQueueSubmitDescriptor cpy_submit = {};
+	cpy_submit.cmds = &cpy_cmd;
+	cpy_submit.cmds_count = 1;
+	cgpu_submit_queue(gfx_queue, &cpy_submit);
+	cgpu_wait_queue_idle(gfx_queue);
+	cgpu_free_command_buffer(cpy_cmd);
+	cgpu_free_command_pool(cpy_cmd_pool);
+	cgpu_free_buffer(tex_upload_buffer);
+
+	free(texItem->locked);
+	texItem->locked = NULL;
 }
 
 //////// Implementation ////////

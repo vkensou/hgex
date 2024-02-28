@@ -39,6 +39,7 @@ struct CTextureList
 {
 	CGPUTextureId		tex;
 	CGPUTextureViewId	tex_view;
+	uint8_t*			locked;
 	CTextureList*		next;
 };
 
