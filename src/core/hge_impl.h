@@ -332,6 +332,7 @@ public:
 
 	CTextureList*		textures;
 	hgeVertex*			VertArray;
+	HTEXTURE			tex_white;
 
 	int					nPrim;
 	int					CurPrimType;

@@ -917,6 +917,11 @@ bool HGE_Impl::_GfxInit()
 	cgpu_update_descriptor_set(per_frame_ubo_descriptor_sets[0], datas, 1);
 	cgpu_update_descriptor_set(per_frame_ubo_descriptor_sets[1], datas, 1);
 
+	tex_white = Texture_Create(1, 1);
+	auto pixels = Texture_Lock(tex_white);
+	*pixels = RGBA(0xff, 0xff, 0xff, 0xff);
+	Texture_Unlock(tex_white);
+
 	return true;
 }
 
@@ -953,7 +958,8 @@ void HGE_Impl::_Resize(int width, int height)
 void HGE_Impl::_GfxDone()
 {
 	while (textures)	
-		Texture_Free((HTEXTURE)textures->tex_view);
+		Texture_Free((HTEXTURE)textures);
+	tex_white = NULL;
 
 	cgpu_wait_queue_idle(gfx_queue);
 	cgpu_wait_queue_idle(present_queue);
@@ -1187,6 +1193,9 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType, bool blend, bool c
 
 CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear, bool color)
 {
+	if (tex == NULL) {
+		tex = tex_white; color = false;
+	}
 	auto texItem = (CTextureList*)tex;
 	if (!texItem)
 		return CGPU_NULLPTR;

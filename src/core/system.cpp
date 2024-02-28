@@ -650,6 +650,7 @@ HGE_Impl::HGE_Impl()
 	textures=0;
 	nPrim = 0;
 	CurPrimType = 0;
+	tex_white=NULL;
 
 	hBass=0;
 	bSilent=false;
