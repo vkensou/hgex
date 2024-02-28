@@ -17,10 +17,10 @@ void hgeColorHSV::SetHWColor(DWORD col)
 	float minv, maxv, delta;
 	float del_R, del_G, del_B;
 
-	a = (col>>24) / 255.0f;
-	r = ((col>>16) & 0xFF) / 255.0f;
-	g = ((col>>8)  & 0xFF) / 255.0f;
-	b = (col       & 0xFF) / 255.0f;
+	a = GETA(col) / 255.0f;
+	r = GETR(col) / 255.0f;
+	g = GETG(col) / 255.0f;
+	b = GETB(col) / 255.0f;
 
 	minv = min(min(r, g), b);
 	maxv = max(max(r, g), b);
@@ -77,6 +77,6 @@ DWORD hgeColorHSV::GetHWColor() const
 		else			 {r = v;  g = p1; b = p2;}
 	}
 
-	return (DWORD(a*255.0f)<<24) + (DWORD(r*255.0f)<<16) + (DWORD(g*255.0f)<<8) + DWORD(b*255.0f);
+	return ARGB(a*255.0f,r*255.0f,g*255.0f,b*255.0f);
 }
 

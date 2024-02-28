@@ -76,15 +76,16 @@ typedef uintptr_t HCHANNEL;
 /*
 ** Hardware color macros
 */
+#define ARGB(a,r,g,b)	((DWORD(a)<<24) + (DWORD(r)<<0) + (DWORD(g)<<8) + (DWORD(b)<<16))
 #define RGBA(r,g,b,a)	((DWORD(r)<<0) + (DWORD(g)<<8) + (DWORD(b)<<16) + (DWORD(a)<<24))
+#define GETA(col)		((col)>>24)
 #define GETR(col)		(((col)>>0) & 0xFF)
 #define GETG(col)		(((col)>>8) & 0xFF)
 #define GETB(col)		(((col)>>16) & 0xFF)
-#define GETA(col)		((col)>>24)
+#define SETA(col,a)		(((col) & 0x00FFFFFF) + (DWORD(a)<<24))
 #define SETR(col,r)		(((col) & 0xFFFFFF00) + (DWORD(r)<<0))
 #define SETG(col,g)		(((col) & 0xFFFF00FF) + (DWORD(g)<<8))
 #define SETB(col,b)		(((col) & 0xFF00FFFF) + (DWORD(b)<<16))
-#define SETA(col,a)		(((col) & 0x00FFFFFF) + (DWORD(a)<<24))
 
 
 /*
