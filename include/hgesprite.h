@@ -26,10 +26,10 @@ public:
 	~hgeSprite() { hge->Release(); }
 	
 	
-	void		Render(float x, float y);
+	void		Render(float x, float y, hgeVertex *recordBuffer = 0);
 	void		RenderEx(float x, float y, float rot, float hscale=1.0f, float vscale=0.0f, hgeVertex *recordBuffer=0);
-	void		RenderStretch(float x1, float y1, float x2, float y2);
-	void		Render4V(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3);
+	void		RenderStretch(float x1, float y1, float x2, float y2, hgeVertex *recordBuffer = 0);
+	void		Render4V(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, hgeVertex *recordBuffer = 0);
 
 	void		SetTexture(HTEXTURE tex);
 	void		SetTextureRect(float x, float y, float w, float h, bool adjSize = true);
@@ -54,6 +54,7 @@ public:
 
 protected:
 	hgeSprite();
+	void		_Render(hgeVertex* recordBuffer);
 	static HGE	*hge;
 
 	hgeQuad		quad;

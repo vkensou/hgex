@@ -70,7 +70,7 @@ hgeSprite::hgeSprite(const hgeSprite &spr)
 	hge=hgeCreate(HGE_VERSION);
 }
 
-void hgeSprite::Render(float x, float y)
+void hgeSprite::Render(float x, float y, hgeVertex* recordBuffer)
 {
 	float tempx1, tempy1, tempx2, tempy2;
 
@@ -84,7 +84,7 @@ void hgeSprite::Render(float x, float y)
 	quad.v[2].x = tempx2; quad.v[2].y = tempy2;
 	quad.v[3].x = tempx1; quad.v[3].y = tempy2;
 
-	hge->Gfx_RenderQuad(&quad);
+	_Render(recordBuffer);
 }
 
 
@@ -125,32 +125,29 @@ void hgeSprite::RenderEx(float x, float y, float rot, float hscale, float vscale
 		quad.v[3].x = tx1 + x; quad.v[3].y = ty2 + y;
 	}
 
-	if (!recordBuffer)
-		hge->Gfx_RenderQuad(&quad);
-	else
-		memcpy(recordBuffer, quad.v, sizeof(hgeVertex) * HGEPRIM_QUADS);
+	_Render(recordBuffer);
 }
 
 
-void hgeSprite::RenderStretch(float x1, float y1, float x2, float y2)
+void hgeSprite::RenderStretch(float x1, float y1, float x2, float y2, hgeVertex* recordBuffer)
 {
 	quad.v[0].x = x1; quad.v[0].y = y1;
 	quad.v[1].x = x2; quad.v[1].y = y1;
 	quad.v[2].x = x2; quad.v[2].y = y2;
 	quad.v[3].x = x1; quad.v[3].y = y2;
 
-	hge->Gfx_RenderQuad(&quad);
+	_Render(recordBuffer);
 }
 
 
-void hgeSprite::Render4V(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3)
+void hgeSprite::Render4V(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, hgeVertex* recordBuffer)
 {
 	quad.v[0].x = x0; quad.v[0].y = y0;
 	quad.v[1].x = x1; quad.v[1].y = y1;
 	quad.v[2].x = x2; quad.v[2].y = y2;
 	quad.v[3].x = x3; quad.v[3].y = y3;
 
-	hge->Gfx_RenderQuad(&quad);
+	_Render(recordBuffer);
 }
 
 
@@ -185,6 +182,14 @@ hgeRect* hgeSprite::GetBoundingBoxEx(float x, float y, float rot, float hscale, 
 	}
 
 	return rect;
+}
+
+void hgeSprite::_Render(hgeVertex* recordBuffer)
+{
+	if (!recordBuffer)
+		hge->Gfx_RenderQuad(&quad);
+	else
+		memcpy(recordBuffer, quad.v, sizeof(hgeVertex) * HGEPRIM_QUADS);
 }
 
 void hgeSprite::SetFlip(bool bX, bool bY, bool bHotSpot)
