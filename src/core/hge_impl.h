@@ -356,7 +356,7 @@ public:
 	void				_AdjustWindow();
 	void				_Resize(int width, int height);
 	bool				_init_lost();
-	void				_render_batch(bool bEndScene=false, bool outOfBudgets=false);
+	void				_render_batch(bool bEndScene=false);
 	void				_SetBlendMode(int blend);
 	void				_SetProjectionMatrix(int width, int height);
 	CGPUCommandBufferId	_RequestCmd(PerFrameData &frame_data);
@@ -364,6 +364,7 @@ public:
 	CGPUDescriptorSetId _RequestDescriptorSet(HTEXTURE tex, bool sampler, bool color);
 	void				_DeleteDescriptorSet(HTEXTURE tex);
 	bool				_OutOfVertexBugets(uint32_t request_vertex_count, uint32_t request_index_count);
+	void				_UploadVertexData(const hgeVertex* v);
 
 	// Audio
 	HINSTANCE			hBass;
