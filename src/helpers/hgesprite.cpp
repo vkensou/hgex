@@ -88,7 +88,7 @@ void hgeSprite::Render(float x, float y)
 }
 
 
-void hgeSprite::RenderEx(float x, float y, float rot, float hscale, float vscale)
+void hgeSprite::RenderEx(float x, float y, float rot, float hscale, float vscale, hgeVertex *recordBuffer)
 {
 	float tx1, ty1, tx2, ty2;
 	float sint, cost;
@@ -125,7 +125,10 @@ void hgeSprite::RenderEx(float x, float y, float rot, float hscale, float vscale
 		quad.v[3].x = tx1 + x; quad.v[3].y = ty2 + y;
 	}
 
-	hge->Gfx_RenderQuad(&quad);
+	if (!recordBuffer)
+		hge->Gfx_RenderQuad(&quad);
+	else
+		memcpy(recordBuffer, quad.v, sizeof(hgeVertex) * HGEPRIM_QUADS);
 }
 
 

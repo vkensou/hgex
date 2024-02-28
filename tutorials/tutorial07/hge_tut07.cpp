@@ -116,17 +116,29 @@ bool FrameFunc()
 bool RenderFunc()
 {
 	int i;
+	int bi;
 	
 	// Render the scene
 	
 	hge->Gfx_BeginScene();
 	bgspr->Render(0,0);
 	
-	for(i=0;i<nObjects;i++)
+	int max_prim;
+	hgeVertex* buffer=hge->Gfx_StartBatch(HGEPRIM_QUADS, spr->GetTexture(), spr->GetBlendMode(), &max_prim);
+	for(i=0,bi=0;i<nObjects;i++)
 	{
-		spr->SetColor(pObjects[i].color); 
-		spr->RenderEx(pObjects[i].x, pObjects[i].y, pObjects[i].rot, pObjects[i].scale);
+		spr->SetColor(pObjects[i].color);
+		if (bi==max_prim)
+		{
+			hge->Gfx_FinishBatch(bi);
+			buffer=hge->Gfx_StartBatch(HGEPRIM_QUADS, spr->GetTexture(), spr->GetBlendMode(), &max_prim);
+			bi=0;
+		}
+		spr->RenderEx(pObjects[i].x, pObjects[i].y, pObjects[i].rot, pObjects[i].scale, 0, buffer);
+		buffer += HGEPRIM_QUADS;
+		bi++;
 	}
+	hge->Gfx_FinishBatch(bi);
 
 	fnt->printf(7, 7, HGETEXT_LEFT, "UP and DOWN to adjust number of hares: %d\nSPACE to change blending mode: %d\nFPS: %d", nObjects, nBlend, hge->Timer_GetFPS());
 	hge->Gfx_EndScene();

@@ -365,6 +365,7 @@ public:
 	void				_DeleteDescriptorSet(HTEXTURE tex);
 	bool				_OutOfVertexBugets(uint32_t request_vertex_count, uint32_t request_index_count);
 	void				_UploadVertexData(const hgeVertex* v);
+	void				_ExpandVertexBuffer();
 
 	// Audio
 	HINSTANCE			hBass;

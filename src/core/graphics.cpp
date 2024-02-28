@@ -248,7 +248,7 @@ void CALL HGE_Impl::Gfx_RenderLine(float x1, float y1, float x2, float y2, DWORD
 
 	if (VertArray)
 	{
-		if (CurPrimType != HGEPRIM_LINES || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_LINES || CurTexture || CurBlendMode != BLEND_DEFAULT)
+		if (CurPrimType != HGEPRIM_LINES || cur_vertex_buffer->vb_eaten + HGEPRIM_LINES > VERTEX_BUFFER_SIZE || CurTexture || CurBlendMode != BLEND_DEFAULT)
 		{
 			_render_batch();
 
@@ -280,7 +280,7 @@ void CALL HGE_Impl::Gfx_RenderTriple(const hgeTriple *triple)
 
 	if (VertArray)
 	{
-		if (CurPrimType != HGEPRIM_TRIPLES || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_TRIPLES || CurTexture != triple->tex || CurBlendMode != triple->blend)
+		if (CurPrimType != HGEPRIM_TRIPLES || cur_vertex_buffer->vb_eaten + HGEPRIM_TRIPLES > VERTEX_BUFFER_SIZE || CurTexture != triple->tex || CurBlendMode != triple->blend)
 		{
 			_render_batch();
 
@@ -302,7 +302,7 @@ void CALL HGE_Impl::Gfx_RenderQuad(const hgeQuad *quad)
 
 	if (VertArray)
 	{
-		if (CurPrimType != HGEPRIM_QUADS || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_QUADS || CurTexture != quad->tex || CurBlendMode != quad->blend)
+		if (CurPrimType != HGEPRIM_QUADS || cur_vertex_buffer->vb_eaten + HGEPRIM_QUADS > VERTEX_BUFFER_SIZE || CurTexture != quad->tex || CurBlendMode != quad->blend)
 		{
 			_render_batch();
 
@@ -320,12 +320,40 @@ void CALL HGE_Impl::Gfx_RenderQuad(const hgeQuad *quad)
 
 hgeVertex* CALL HGE_Impl::Gfx_StartBatch(int prim_type, HTEXTURE tex, int blend, int *max_prim)
 {
+	if (!prepared)
+		Gfx_Clear(0);
+
+	if (VertArray)
+	{
+		if (CurPrimType != prim_type || cur_vertex_buffer->vb_eaten + prim_type > VERTEX_BUFFER_SIZE || CurTexture != tex || CurBlendMode != blend)
+		{
+			_render_batch();
+
+			CurPrimType = HGEPRIM_QUADS;
+			if (CurBlendMode != blend) _SetBlendMode(blend);
+			if (tex != CurTexture)
+			{
+				CurTexture = tex;
+			}
+		}
+
+		*max_prim = (VERTEX_BUFFER_SIZE - cur_vertex_buffer->vb_eaten) / CurPrimType;
+		if (*max_prim == 0)
+		{
+			_ExpandVertexBuffer();
+			*max_prim = (VERTEX_BUFFER_SIZE - cur_vertex_buffer->vb_eaten) / CurPrimType;
+		}
+		return VertArray;
+	}
 	return 0;
 }
 
 void CALL HGE_Impl::Gfx_FinishBatch(int nprim)
 {
-	nPrim=nprim;
+	int vertex_eat = nprim * CurPrimType, index_eat = nprim * (CurPrimType == HGEPRIM_QUADS ? 6 : 0);
+	nPrim += nprim;
+	cur_vertex_buffer->vb_eaten += vertex_eat;
+	cur_vertex_buffer->ib_eaten += index_eat;
 }
 
 HTARGET CALL HGE_Impl::Target_Create(int width, int height, bool zbuffer)
@@ -1278,18 +1306,22 @@ void HGE_Impl::_UploadVertexData(const hgeVertex* v)
 	if (_OutOfVertexBugets(vertex_eat, index_eat))
 	{
 		_render_batch(false);
-
-		if (!cur_vertex_buffer->next)
-			cur_vertex_buffer->next = createVertexBuffer(device, VERTEX_BUFFER_SIZE);
-
-		cur_vertex_buffer = cur_vertex_buffer->next;
-		VertArray = (hgeVertex*)cur_vertex_buffer->pVB->info->cpu_mapped_address;
-		cur_vertex_buffer->ib_eaten = 0;
-		cur_vertex_buffer->vb_eaten = 0;
+		_ExpandVertexBuffer();
 	}
 
 	memcpy(&VertArray[nPrim * CurPrimType], v, sizeof(hgeVertex) * CurPrimType);
 	nPrim++;
 	cur_vertex_buffer->vb_eaten += vertex_eat;
 	cur_vertex_buffer->ib_eaten += index_eat;
+}
+
+void HGE_Impl::_ExpandVertexBuffer()
+{
+	if (!cur_vertex_buffer->next)
+		cur_vertex_buffer->next = createVertexBuffer(device, VERTEX_BUFFER_SIZE);
+
+	cur_vertex_buffer = cur_vertex_buffer->next;
+	VertArray = (hgeVertex*)cur_vertex_buffer->pVB->info->cpu_mapped_address;
+	cur_vertex_buffer->ib_eaten = 0;
+	cur_vertex_buffer->vb_eaten = 0;
 }

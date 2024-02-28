@@ -27,7 +27,7 @@ public:
 	
 	
 	void		Render(float x, float y);
-	void		RenderEx(float x, float y, float rot, float hscale=1.0f, float vscale=0.0f);
+	void		RenderEx(float x, float y, float rot, float hscale=1.0f, float vscale=0.0f, hgeVertex *recordBuffer=0);
 	void		RenderStretch(float x1, float y1, float x2, float y2);
 	void		Render4V(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3);
 
