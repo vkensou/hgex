@@ -56,6 +56,12 @@ struct CStreamList
 	CStreamList*		next;
 };
 
+struct CShader
+{
+	CGPUShaderEntryDescriptor entry[2];
+	CGPURootSignatureId root_sigs;
+};
+
 struct CInputEventList
 {
 	hgeInputEvent		event;
@@ -312,8 +318,7 @@ public:
 	bool prepared;
 	CGPUBufferId pVB;
 	CGPUBufferId pIB;
-	CGPUShaderEntryDescriptor default_shader[4];
-	CGPURootSignatureId default_shader_root_sigs[2];
+	CShader default_shaders[2];
 	std::unordered_map<uint32_t, CGPURenderPipelineId> default_shader_pipelines;
 	std::unordered_map<DescriptorSetKey, CGPUDescriptorSetId, DescriptorSetKeyHash> default_shader_descriptor_sets;
 	CGPUSamplerId linear_sampler, point_sampler;

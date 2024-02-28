@@ -10,6 +10,7 @@
 #include "hge_impl.h"
 #include "FreeImage.h"
 #include "glm/gtc/matrix_transform.hpp"
+#include <span>
 
 void hge_graphicslog(void* user_data, ECGPULogSeverity severity, const char* fmt, ...)
 {
@@ -600,6 +601,47 @@ void HGE_Impl::_SetProjectionMatrix(int width, int height)
 	//matProj[1][1] *= -1;
 }
 
+CShader loadShader(CGPUDeviceId device, std::span<uint8_t> vs, std::span<uint8_t> ps)
+{
+	CGPUShaderLibraryDescriptor vs_desc = {
+		.name = u8"VertexShaderLibrary",
+		.code = reinterpret_cast<const uint32_t*>(vs.data()),
+		.code_size = (uint32_t)vs.size(),
+		.stage = CGPU_SHADER_STAGE_VERT,
+	};
+	CGPUShaderLibraryDescriptor ps_desc = {
+		.name = u8"FragmentShaderLibrary",
+		.code = reinterpret_cast<const uint32_t*>(ps.data()),
+		.code_size = (uint32_t)ps.size(),
+		.stage = CGPU_SHADER_STAGE_FRAG,
+	};
+
+	CGPUShaderLibraryId vertex_shader = cgpu_create_shader_library(device, &vs_desc);
+	CGPUShaderLibraryId fragment_shader = cgpu_create_shader_library(device, &ps_desc);
+
+	CShader shader;
+	shader.entry[0].stage = CGPU_SHADER_STAGE_VERT;
+	shader.entry[0].entry = u8"main";
+	shader.entry[0].library = vertex_shader;
+	shader.entry[1].stage = CGPU_SHADER_STAGE_FRAG;
+	shader.entry[1].entry = u8"main";
+	shader.entry[1].library = fragment_shader;
+	CGPURootSignatureDescriptor rs_desc = {
+		.shaders = shader.entry,
+		.shader_count = 2
+	};
+	shader.root_sigs = cgpu_create_root_signature(device, &rs_desc);
+
+	return shader;
+}
+
+void freeShader(CShader shader)
+{
+	cgpu_free_root_signature(shader.root_sigs);
+	cgpu_free_shader_library(shader.entry[0].library);
+	cgpu_free_shader_library(shader.entry[1].library);
+}
+
 bool HGE_Impl::_GfxInit()
 {
 	FreeImage_Initialise(true);
@@ -778,66 +820,8 @@ bool HGE_Impl::_GfxInit()
 #include "hge_color_add.ps.spv.h"
 	};
 
-	CGPUShaderLibraryDescriptor vs_color_mul_desc = {
-		.name = u8"VertexShaderLibrary",
-		.code = reinterpret_cast<const uint32_t*>(hge_vert_spv),
-		.code_size = sizeof(hge_vert_spv),
-		.stage = CGPU_SHADER_STAGE_VERT,
-	};
-	CGPUShaderLibraryDescriptor ps_color_mul_desc = {
-		.name = u8"FragmentShaderLibrary",
-		.code = reinterpret_cast<const uint32_t*>(hge_color_mul_frag_spv),
-		.code_size = sizeof(hge_color_mul_frag_spv),
-		.stage = CGPU_SHADER_STAGE_FRAG,
-	};
-	CGPUShaderLibraryDescriptor vs_color_add_desc = {
-		.name = u8"VertexShaderLibrary",
-		.code = reinterpret_cast<const uint32_t*>(hge_vert_spv),
-		.code_size = sizeof(hge_vert_spv),
-		.stage = CGPU_SHADER_STAGE_VERT,
-	};
-	CGPUShaderLibraryDescriptor ps_color_add_desc = {
-		.name = u8"FragmentShaderLibrary",
-		.code = reinterpret_cast<const uint32_t*>(hge_color_add_frag_spv),
-		.code_size = sizeof(hge_color_add_frag_spv),
-		.stage = CGPU_SHADER_STAGE_FRAG,
-	};
-	CGPUShaderLibraryId vertex_color_mul_shader = cgpu_create_shader_library(device, &vs_color_mul_desc);
-	CGPUShaderLibraryId fragment_color_mul_shader = cgpu_create_shader_library(device, &ps_color_mul_desc);
-	CGPUShaderLibraryId vertex_color_add_shader = cgpu_create_shader_library(device, &vs_color_add_desc);
-	CGPUShaderLibraryId fragment_color_add_shader = cgpu_create_shader_library(device, &ps_color_add_desc);
-	default_shader[0].stage = CGPU_SHADER_STAGE_VERT;
-	default_shader[0].entry = u8"main";
-	default_shader[0].library = vertex_color_mul_shader;
-	default_shader[1].stage = CGPU_SHADER_STAGE_FRAG;
-	default_shader[1].entry = u8"main";
-	default_shader[1].library = fragment_color_mul_shader;
-	default_shader[2].stage = CGPU_SHADER_STAGE_VERT;
-	default_shader[2].entry = u8"main";
-	default_shader[2].library = vertex_color_add_shader;
-	default_shader[3].stage = CGPU_SHADER_STAGE_FRAG;
-	default_shader[3].entry = u8"main";
-	default_shader[3].library = fragment_color_add_shader;
-	CGPUShaderEntryDescriptor shader_color_mul[2] =
-	{
-		default_shader[0],
-		default_shader[1],
-	};
-	CGPURootSignatureDescriptor default_color_mul_rs_desc = {
-		.shaders = shader_color_mul,
-		.shader_count = 2
-	};
-	default_shader_root_sigs[0] = cgpu_create_root_signature(device, &default_color_mul_rs_desc);
-	CGPUShaderEntryDescriptor shader_color_add[2] =
-	{
-		default_shader[2],
-		default_shader[3],
-	};
-	CGPURootSignatureDescriptor default_color_add_rs_desc = {
-		.shaders = shader_color_add,
-		.shader_count = 2
-	};
-	default_shader_root_sigs[1] = cgpu_create_root_signature(device, &default_color_add_rs_desc);
+	default_shaders[0] = loadShader(device, hge_vert_spv, hge_color_mul_frag_spv);
+	default_shaders[1] = loadShader(device, hge_vert_spv, hge_color_add_frag_spv);
 
 	CGPUSamplerDescriptor linear_sampler_desc = {
 		.min_filter = CGPU_FILTER_TYPE_LINEAR,
@@ -874,13 +858,13 @@ bool HGE_Impl::_GfxInit()
 	per_frame_ubo = cgpu_create_buffer(device, &per_frame_ubo_desc);
 
 	CGPUDescriptorSetDescriptor per_frame_ubo_set_desc_0 = {
-		.root_signature = default_shader_root_sigs[0],
+		.root_signature = default_shaders[0].root_sigs,
 		.set_index = 1,
 	};
 	per_frame_ubo_descriptor_sets[0] = cgpu_create_descriptor_set(device, &per_frame_ubo_set_desc_0);
 
 	CGPUDescriptorSetDescriptor per_frame_ubo_set_desc_1 = {
-		.root_signature = default_shader_root_sigs[1],
+		.root_signature = default_shaders[1].root_sigs,
 		.set_index = 1,
 	};
 	per_frame_ubo_descriptor_sets[1] = cgpu_create_descriptor_set(device, &per_frame_ubo_set_desc_1);
@@ -1010,15 +994,9 @@ void HGE_Impl::_GfxDone()
 		cgpu_free_descriptor_set(descriptor_set);
 	}
 
-	cgpu_free_root_signature(default_shader_root_sigs[0]);
-	cgpu_free_root_signature(default_shader_root_sigs[1]);
-	cgpu_free_shader_library(default_shader[0].library);
-	cgpu_free_shader_library(default_shader[1].library);
-	cgpu_free_shader_library(default_shader[2].library);
-	cgpu_free_shader_library(default_shader[3].library);
-
-	memset(default_shader_root_sigs, 0, sizeof(default_shader_root_sigs));
-	memset(default_shader, 0, sizeof(default_shader));
+	freeShader(default_shaders[0]);
+	freeShader(default_shaders[1]);
+	memset(default_shaders, 0, sizeof(default_shaders));
 
 	for (auto [texture, texture_view] : deleted_textures)
 	{
@@ -1032,7 +1010,7 @@ void HGE_Impl::_GfxDone()
 
 	cgpu_free_descriptor_set(per_frame_ubo_descriptor_sets[0]);
 	cgpu_free_descriptor_set(per_frame_ubo_descriptor_sets[1]);
-	memset(default_shader_root_sigs, 0, sizeof(per_frame_ubo_descriptor_sets));
+	memset(per_frame_ubo_descriptor_sets, 0, sizeof(per_frame_ubo_descriptor_sets));
 
 	// for (auto shader : deleted_shaders)
 	// 	deleteShaderImpl(shader);
@@ -1163,9 +1141,9 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType, bool blend, bool c
 		else if (primType == HGEPRIM_LINES)
 			prim_topology = CGPU_PRIM_TOPO_LINE_LIST;
 		CGPURenderPipelineDescriptor rp_desc = {
-			.root_signature = default_shader_root_sigs[color],
-			.vertex_shader = &default_shader[color*2+0],
-			.fragment_shader = &default_shader[color*2+1],
+			.root_signature = default_shaders[color].root_sigs,
+			.vertex_shader = &default_shaders[color].entry[0],
+			.fragment_shader = &default_shaders[color].entry[1],
 			.vertex_layout = &vertex_layout,
 			.blend_state = blend ? &blend_blend_state : &blend_add_state,
 			.depth_state = &depth_state,
@@ -1196,7 +1174,7 @@ CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear, b
 	else
 	{
 		CGPUDescriptorSetDescriptor set_desc = {
-			.root_signature = default_shader_root_sigs[color],
+			.root_signature = default_shaders[color].root_sigs,
 			.set_index = 0,
 		};
 		auto descriptor_set = cgpu_create_descriptor_set(device, &set_desc);
