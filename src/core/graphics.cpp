@@ -349,7 +349,7 @@ HTEXTURE CALL HGE_Impl::Texture_Create(int width, int height)
 		.height = (uint64_t)height,
 		.depth = 1,
 		.array_size = 1,
-		.format = CGPU_FORMAT_R8G8B8A8_SRGB,
+		.format = CGPU_FORMAT_R8G8B8A8_UNORM,
 		.mip_levels = 1,
 		.owner_queue = gfx_queue,
 		.start_state = CGPU_RESOURCE_STATE_COPY_DEST,
@@ -712,7 +712,7 @@ bool HGE_Impl::_GfxInit()
 
 	surface = cgpu_surface_from_native_view(device, hwnd);
 
-	ECGPUFormat swapchainFormat = CGPU_FORMAT_R8G8B8A8_SRGB;
+	ECGPUFormat swapchainFormat = CGPU_FORMAT_R8G8B8A8_UNORM;
 	uint32_t swapchainCount = 1;
 	CGPUSwapChainDescriptor descriptor = {
 		.present_queues = &present_queue,
@@ -1124,7 +1124,7 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType, bool blend, bool c
 	}
 	else
 	{
-		ECGPUFormat swapchainFormat = CGPU_FORMAT_R8G8B8A8_SRGB;
+		ECGPUFormat swapchainFormat = CGPU_FORMAT_R8G8B8A8_UNORM;
 		ECGPUFormat formats[1] = { swapchainFormat };
 		CGPUVertexLayout vertex_layout = {
 			.attribute_count = 3,
