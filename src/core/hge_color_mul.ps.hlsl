@@ -13,5 +13,7 @@ SamplerState texture_sampler : register(s0);
 [shader("pixel")]
 float4 main(VSOutput input) : SV_TARGET
 {
-    return input.Color * texture.Sample(texture_sampler, input.UV);
+    float4 vertexColor = input.Color;
+    float4 textureColor = texture.Sample(texture_sampler, input.UV);
+    return float4(vertexColor.rgb * textureColor.rgb, vertexColor.a * textureColor.a);
 }
