@@ -69,6 +69,15 @@ struct CInputEventList
 	CInputEventList*	next;
 };
 
+struct CVertexBufferList
+{
+	CGPUBufferId pVB;
+	CGPUBufferId pIB;
+	uint32_t vb_eaten;
+	uint32_t ib_eaten;
+	CVertexBufferList* next;
+};
+
 struct PerSwapChainInfo
 {
 	CGPUTextureId texture;
@@ -317,8 +326,7 @@ public:
 	CGPUCommandBufferId cur_cmd;
 	CGPURenderPassEncoderId cur_rp_encoder;
 	bool prepared;
-	CGPUBufferId pVB;
-	CGPUBufferId pIB;
+	CVertexBufferList* cur_vertex_buffer;
 	CShader default_shaders[2];
 	std::unordered_map<uint32_t, CGPURenderPipelineId> default_shader_pipelines;
 	std::unordered_map<DescriptorSetKey, CGPUDescriptorSetId, DescriptorSetKeyHash> default_shader_descriptor_sets;
@@ -331,6 +339,7 @@ public:
 	glm::mat4			matProj;
 
 	CTextureList*		textures;
+	CVertexBufferList*	vertexBuffers;
 	hgeVertex*			VertArray;
 	HTEXTURE			tex_white;
 
@@ -347,13 +356,14 @@ public:
 	void				_AdjustWindow();
 	void				_Resize(int width, int height);
 	bool				_init_lost();
-	void				_render_batch(bool bEndScene=false);
+	void				_render_batch(bool bEndScene=false, bool outOfBudgets=false);
 	void				_SetBlendMode(int blend);
 	void				_SetProjectionMatrix(int width, int height);
 	CGPUCommandBufferId	_RequestCmd(PerFrameData &frame_data);
 	CGPURenderPipelineId _RequestPipeline(int primType, bool blend, bool color);
 	CGPUDescriptorSetId _RequestDescriptorSet(HTEXTURE tex, bool sampler, bool color);
 	void				_DeleteDescriptorSet(HTEXTURE tex);
+	bool				_OutOfVertexBugets(uint32_t request_vertex_count, uint32_t request_index_count);
 
 	// Audio
 	HINSTANCE			hBass;

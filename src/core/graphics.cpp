@@ -159,6 +159,10 @@ bool CALL HGE_Impl::Gfx_BeginScene(HTARGET targ)
 	CurDefaultShaderPipeline = CGPU_NULLPTR;
 	CurDefaultDescriptorSet = CGPU_NULLPTR;
 	CurBlendMode = 0;
+	cur_vertex_buffer = vertexBuffers;
+	VertArray = (hgeVertex*)cur_vertex_buffer->pVB->info->cpu_mapped_address;
+	cur_vertex_buffer->ib_eaten = 0;
+	cur_vertex_buffer->vb_eaten = 0;
 
 	cgpu_reset_command_pool(cur_frame_data.pool);
 
@@ -244,15 +248,15 @@ void CALL HGE_Impl::Gfx_RenderLine(float x1, float y1, float x2, float y2, DWORD
 
 	if (VertArray)
 	{
-		if (CurPrimType != HGEPRIM_LINES || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_LINES || CurTexture || CurBlendMode != BLEND_DEFAULT)
+		bool outOfBudgets = _OutOfVertexBugets(2, 0);
+		if (outOfBudgets || CurPrimType != HGEPRIM_LINES || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_LINES || CurTexture || CurBlendMode != BLEND_DEFAULT)
 		{
-			_render_batch();
+			_render_batch(false, outOfBudgets);
 
 			CurPrimType = HGEPRIM_LINES;
 			if (CurBlendMode != BLEND_DEFAULT) _SetBlendMode(BLEND_DEFAULT);
 			if (CurTexture)
 			{
-				//pD3DDevice->SetTexture(0, 0);
 				CurTexture = 0;
 			}
 		}
@@ -266,6 +270,8 @@ void CALL HGE_Impl::Gfx_RenderLine(float x1, float y1, float x2, float y2, DWORD
 			VertArray[i].ty = VertArray[i + 1].ty = 0.0f;
 
 		nPrim++;
+		cur_vertex_buffer->vb_eaten += 2;
+		cur_vertex_buffer->ib_eaten += 0;
 	}
 }
 
@@ -276,9 +282,10 @@ void CALL HGE_Impl::Gfx_RenderTriple(const hgeTriple *triple)
 
 	if (VertArray)
 	{
-		if (CurPrimType != HGEPRIM_TRIPLES || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_TRIPLES || CurTexture != triple->tex || CurBlendMode != triple->blend)
+		bool outOfBudgets = _OutOfVertexBugets(3, 0);
+		if (outOfBudgets || CurPrimType != HGEPRIM_TRIPLES || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_TRIPLES || CurTexture != triple->tex || CurBlendMode != triple->blend)
 		{
-			_render_batch();
+			_render_batch(false, outOfBudgets);
 
 			CurPrimType = HGEPRIM_TRIPLES;
 			if (CurBlendMode != triple->blend) _SetBlendMode(triple->blend);
@@ -289,6 +296,8 @@ void CALL HGE_Impl::Gfx_RenderTriple(const hgeTriple *triple)
 
 		memcpy(&VertArray[nPrim * HGEPRIM_TRIPLES], triple->v, sizeof(hgeVertex) * HGEPRIM_TRIPLES);
 		nPrim++;
+		cur_vertex_buffer->vb_eaten += 3;
+		cur_vertex_buffer->ib_eaten += 0;
 	}
 }
 
@@ -299,9 +308,10 @@ void CALL HGE_Impl::Gfx_RenderQuad(const hgeQuad *quad)
 
 	if (VertArray)
 	{
-		if (CurPrimType != HGEPRIM_QUADS || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_QUADS || CurTexture != quad->tex || CurBlendMode != quad->blend)
+		bool outOfBudgets = _OutOfVertexBugets(4, 6);
+		if (outOfBudgets || CurPrimType != HGEPRIM_QUADS || nPrim >= VERTEX_BUFFER_SIZE / HGEPRIM_QUADS || CurTexture != quad->tex || CurBlendMode != quad->blend)
 		{
-			_render_batch();
+			_render_batch(false, outOfBudgets);
 
 			CurPrimType = HGEPRIM_QUADS;
 			if (CurBlendMode != quad->blend) _SetBlendMode(quad->blend);
@@ -313,6 +323,8 @@ void CALL HGE_Impl::Gfx_RenderQuad(const hgeQuad *quad)
 
 		memcpy(&VertArray[nPrim * HGEPRIM_QUADS], quad->v, sizeof(hgeVertex) * HGEPRIM_QUADS);
 		nPrim++;
+		cur_vertex_buffer->vb_eaten += 4;
+		cur_vertex_buffer->ib_eaten += 6;
 	}
 }
 
@@ -558,30 +570,88 @@ void CALL HGE_Impl::Texture_Unlock(HTEXTURE tex)
 
 //////// Implementation ////////
 
-void HGE_Impl::_render_batch(bool bEndScene)
+CVertexBufferList* createVertexBuffer(CGPUDeviceId device, uint32_t vertex_buffer_budget)
+{
+	uint64_t vb_size = vertex_buffer_budget * sizeof(hgeVertex);
+	CGPUBufferDescriptor vb_desc = {
+		.size = vb_size,
+		.name = u8"pVB",
+		.descriptors = CGPU_RESOURCE_TYPE_VERTEX_BUFFER,
+		.memory_usage = CGPU_MEM_USAGE_GPU_ONLY,
+		.flags = CGPU_BCF_HOST_VISIBLE,
+		.start_state = CGPU_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+	};
+	auto pVB = cgpu_create_buffer(device, &vb_desc);
+
+	CGPUBufferRange vb_range = { .offset = 0, .size = vb_size };
+	cgpu_map_buffer(pVB, &vb_range);
+
+	uint64_t ib_size = vertex_buffer_budget * 6 / 4 * sizeof(WORD);
+	CGPUBufferDescriptor ib_desc = {
+		.size = ib_size,
+		.name = u8"pIB",
+		.descriptors = CGPU_RESOURCE_TYPE_INDEX_BUFFER,
+		.memory_usage = CGPU_MEM_USAGE_GPU_ONLY,
+		.flags = CGPU_BCF_HOST_VISIBLE,
+		.start_state = CGPU_RESOURCE_STATE_INDEX_BUFFER,
+	};
+	auto pIB = cgpu_create_buffer(device, &ib_desc);
+
+	if (!pIB)
+	{
+		return false;
+	}
+
+	CGPUBufferRange ib_range = { .offset = 0, .size = ib_size };
+	cgpu_map_buffer(pIB, &ib_range);
+
+	WORD* pIndices = (WORD*)pIB->info->cpu_mapped_address, n = 0;
+	for (int i = 0; i < VERTEX_BUFFER_SIZE / 4; i++) {
+		*pIndices++ = n;
+		*pIndices++ = n + 1;
+		*pIndices++ = n + 2;
+		*pIndices++ = n + 2;
+		*pIndices++ = n + 3;
+		*pIndices++ = n;
+		n += 4;
+	}
+
+	cgpu_unmap_buffer(pIB);
+
+	auto vertexBuffer = new CVertexBufferList();
+	vertexBuffer->pVB = pVB;
+	vertexBuffer->pIB = pIB;
+	vertexBuffer->vb_eaten = 0;
+	vertexBuffer->ib_eaten = 0;
+	vertexBuffer->next = NULL;
+	return vertexBuffer;
+}
+
+void HGE_Impl::_render_batch(bool bEndScene, bool outOfBudgets)
 {
 	if (VertArray)
 	{
 		const uint32_t vert_stride = sizeof(hgeVertex);
-		int eaten = 0;
+		int vertex_eat = 0, index_eat = 0;
 		if (nPrim)
 		{
 			switch (CurPrimType)
 			{
 			case HGEPRIM_QUADS:
-				eaten = nPrim << 2;
+				vertex_eat = nPrim << 2;
+				index_eat = nPrim * 6;
 				break;
 
 			case HGEPRIM_TRIPLES:
-				eaten = nPrim * 3;
+				vertex_eat = nPrim * 3;
 				break;
 
 			case HGEPRIM_LINES:
-				eaten = nPrim * 2;
+				vertex_eat = nPrim * 2;
 				break;
 			}
 
-			if (eaten)
+			if (vertex_eat)
 			{
 				bool blend = (CurBlendMode & BLEND_ALPHABLEND) != 0;
 				bool color = (CurBlendMode & BLEND_COLORADD) != 0;
@@ -599,19 +669,33 @@ void HGE_Impl::_render_batch(bool bEndScene)
 					CurDefaultDescriptorSet = descriptor_set;
 				}
 				cgpu_render_encoder_bind_descriptor_set(cur_rp_encoder, per_frame_ubo_descriptor_sets[color]);
-				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &pVB, &vert_stride, CGPU_NULLPTR);
-				cgpu_render_encoder_bind_index_buffer(cur_rp_encoder, pIB, sizeof(WORD), 0);
+				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &cur_vertex_buffer->pVB, &vert_stride, CGPU_NULLPTR);
+				cgpu_render_encoder_bind_index_buffer(cur_rp_encoder, cur_vertex_buffer->pIB, sizeof(WORD), 0);
 				if (CurPrimType == HGEPRIM_QUADS)
-					cgpu_render_encoder_draw_indexed(cur_rp_encoder, nPrim * 6, (VertArray - pVB->info->cpu_mapped_address) / 4 * 6, 0);
+					cgpu_render_encoder_draw_indexed(cur_rp_encoder, index_eat, cur_vertex_buffer->ib_eaten - index_eat, 0);
 				else
-					cgpu_render_encoder_draw(cur_rp_encoder, eaten, VertArray - pVB->info->cpu_mapped_address);
+					cgpu_render_encoder_draw(cur_rp_encoder, vertex_eat, cur_vertex_buffer->vb_eaten - vertex_eat);
 			}
 
 			nPrim = 0;
 		}
 
-		if (bEndScene) VertArray = (hgeVertex*)pVB->info->cpu_mapped_address;
-		else VertArray += eaten;
+		if (bEndScene) VertArray = 0;
+		else
+		{
+			VertArray += vertex_eat;
+
+			if (outOfBudgets)
+			{
+				if (!cur_vertex_buffer->next)
+					cur_vertex_buffer->next = createVertexBuffer(device, VERTEX_BUFFER_SIZE);
+
+				cur_vertex_buffer = cur_vertex_buffer->next;
+				VertArray = (hgeVertex*)cur_vertex_buffer->pVB->info->cpu_mapped_address;
+				cur_vertex_buffer->ib_eaten = 0;
+				cur_vertex_buffer->vb_eaten = 0;
+			}
+		}
 	}
 }
 
@@ -785,53 +869,9 @@ bool HGE_Impl::_GfxInit()
 	current_swapchain_index = 0;
 	current_frame_index = 0;
 
-	uint64_t vb_size = VERTEX_BUFFER_SIZE * sizeof(hgeVertex);
-	CGPUBufferDescriptor vb_desc = {
-		.size = vb_size,
-		.name = u8"pVB",
-		.descriptors = CGPU_RESOURCE_TYPE_VERTEX_BUFFER,
-		.memory_usage = CGPU_MEM_USAGE_GPU_ONLY,
-		.flags = CGPU_BCF_HOST_VISIBLE,
-		.start_state = CGPU_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
-	};
-	pVB = cgpu_create_buffer(device, &vb_desc);
-
-	CGPUBufferRange vb_range = { .offset = 0, .size = vb_size };
-	cgpu_map_buffer(pVB, &vb_range);
-	VertArray = (hgeVertex*)pVB->info->cpu_mapped_address;
-
-	uint64_t ib_size = VERTEX_BUFFER_SIZE * 6 / 4 * sizeof(WORD);
-	CGPUBufferDescriptor ib_desc = {
-		.size = ib_size,
-		.name = u8"pIB",
-		.descriptors = CGPU_RESOURCE_TYPE_INDEX_BUFFER,
-		.memory_usage = CGPU_MEM_USAGE_GPU_ONLY,
-		.flags = CGPU_BCF_HOST_VISIBLE,
-		.start_state = CGPU_RESOURCE_STATE_INDEX_BUFFER,
-	};
-	pIB = cgpu_create_buffer(device, &ib_desc);
-
-	if (!pIB)
-	{
-		_PostError("Can't lock D3D index buffer");
-		return false;
-	}
-
-	CGPUBufferRange ib_range = { .offset = 0, .size = ib_size };
-	cgpu_map_buffer(pIB, &ib_range);
-
-	WORD* pIndices = (WORD*)pIB->info->cpu_mapped_address, n = 0;
-	for (int i = 0; i < VERTEX_BUFFER_SIZE / 4; i++) {
-		*pIndices++ = n;
-		*pIndices++ = n + 1;
-		*pIndices++ = n + 2;
-		*pIndices++ = n + 2;
-		*pIndices++ = n + 3;
-		*pIndices++ = n;
-		n += 4;
-	}
-
-	cgpu_unmap_buffer(pIB);
+	vertexBuffers = createVertexBuffer(device, VERTEX_BUFFER_SIZE);
+	cur_vertex_buffer = vertexBuffers;
+	VertArray = (hgeVertex*)cur_vertex_buffer->pVB->info->cpu_mapped_address;
 
 	uint8_t hge_vert_spv[] = {
 #include "hge.vs.spv.h"
@@ -1003,16 +1043,22 @@ void HGE_Impl::_GfxDone()
 	cgpu_free_sampler(point_sampler);
 	point_sampler = CGPU_NULLPTR;
 
-	if (pVB)
+	while (vertexBuffers)
 	{
-		cgpu_unmap_buffer(pVB);
-		cgpu_free_buffer(pVB);
-	}
-	pVB = CGPU_NULLPTR;
+		if (vertexBuffers->pVB)
+		{
+			cgpu_unmap_buffer(vertexBuffers->pVB);
+			cgpu_free_buffer(vertexBuffers->pVB);
+		}
 
-	if (pIB)
-		cgpu_free_buffer(pIB);
-	pIB = CGPU_NULLPTR;
+		if (vertexBuffers->pIB)
+			cgpu_free_buffer(vertexBuffers->pIB);
+		
+		auto prev = vertexBuffers;
+		vertexBuffers = vertexBuffers->next;
+		delete prev;
+	}
+
 
 	for (auto [_, pipeline] : default_shader_pipelines)
 	{
@@ -1259,4 +1305,9 @@ void HGE_Impl::_DeleteDescriptorSet(HTEXTURE tex)
 			default_shader_descriptor_sets.erase(iter);
 		}
 	}
+}
+
+bool HGE_Impl::_OutOfVertexBugets(uint32_t request_vertex_count, uint32_t request_index_count)
+{
+	return (cur_vertex_buffer->vb_eaten + request_vertex_count) > VERTEX_BUFFER_SIZE || (cur_vertex_buffer->ib_eaten + request_index_count) > VERTEX_BUFFER_SIZE * 6 / 4;
 }

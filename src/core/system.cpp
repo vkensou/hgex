@@ -644,10 +644,10 @@ HGE_Impl::HGE_Impl()
 	swapchain = CGPU_NULLPTR;
 	render_pass = CGPU_NULLPTR;
 	render_finished_semaphore = CGPU_NULLPTR;
-	pVB = CGPU_NULLPTR;
-	pIB = CGPU_NULLPTR;
+	cur_vertex_buffer=0;
 	VertArray=0;
 	textures=0;
+	vertexBuffers = 0;
 	nPrim = 0;
 	CurPrimType = 0;
 	tex_white=NULL;

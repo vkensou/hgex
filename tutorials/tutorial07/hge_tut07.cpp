@@ -185,7 +185,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		// Initialize objects list
 
 		pObjects=new sprObject[MAX_OBJECTS];
-		nObjects=100;
+		nObjects=1000;
 
 		for(i=0;i<MAX_OBJECTS;i++)
 		{
