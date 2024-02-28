@@ -343,7 +343,7 @@ hgeVertex* CALL HGE_Impl::Gfx_StartBatch(int prim_type, HTEXTURE tex, int blend,
 			_ExpandVertexBuffer();
 			*max_prim = (VERTEX_BUFFER_SIZE - cur_vertex_buffer->vb_eaten) / CurPrimType;
 		}
-		return VertArray;
+		return VertArray + nPrim * CurPrimType;
 	}
 	return 0;
 }
