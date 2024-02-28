@@ -505,8 +505,8 @@ void cmdLoadPreset(int n)
 	SliderSetValue(CMD_PA_BEND, state.ps->info.colColorEnd.b);
 	SliderSetValue(CMD_PA_RGBVAR, state.ps->info.fColorVar);
 
-	col1=state.ps->info.colColorStart.GetHWColor() | 0xFF000000;
-	col2=state.ps->info.colColorEnd.GetHWColor() | 0xFF000000;
+	col1=state.ps->info.colColorStart.GetHWColor() | ARGB(0xFF,0x00,0x00,0x00);
+	col2=state.ps->info.colColorEnd.GetHWColor() | ARGB(0xFF,0x00,0x00,0x00);
 	sprColor->SetColor(col1,0); sprColor->SetColor(col1,1);
 	sprColor->SetColor(col2,2); sprColor->SetColor(col2,3);
 }
@@ -526,8 +526,8 @@ void cmdChangeColor(int id)
 		case CMD_PA_BEND:  state.ps->info.colColorEnd.b=val; break;
 	}
 
-	col1=state.ps->info.colColorStart.GetHWColor() | 0xFF000000;
-	col2=state.ps->info.colColorEnd.GetHWColor() | 0xFF000000;
+	col1=state.ps->info.colColorStart.GetHWColor() | ARGB(0xFF,0x00,0x00,0x00);
+	col2=state.ps->info.colColorEnd.GetHWColor() | ARGB(0xFF,0x00,0x00,0x00);
 	sprColor->SetColor(col1,0); sprColor->SetColor(col1,1);
 	sprColor->SetColor(col2,2); sprColor->SetColor(col2,3);
 }

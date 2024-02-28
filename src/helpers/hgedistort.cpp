@@ -33,7 +33,7 @@ hgeDistortionMesh::hgeDistortionMesh(int cols, int rows)
 		disp_array[i].ty=0.0f;
 		
 		disp_array[i].z=0.5f;
-		disp_array[i].col=0xFFFFFFFF;
+		disp_array[i].col=ARGB(0xFF,0xFF,0xFF,0xFF);
 	}
 }
 

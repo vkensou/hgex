@@ -86,10 +86,10 @@ bool RenderFunc()
 			v0=(float)vChars[i].y+psy-fh2;
 			v1=v0+vChars[i].h;
 
-			hge->Gfx_RenderLine(u0+0.5f, v0+0.5f, u1,      v0+0.5f, 0xFF95883F);
-			hge->Gfx_RenderLine(u1,      v0+0.5f, u1,      v1,      0xFF95883F);
-			hge->Gfx_RenderLine(u1,      v1,      u0+0.5f, v1,      0xFF95883F);
-			hge->Gfx_RenderLine(u0+0.5f, v1,      u0+0.5f, v0+0.5f, 0xFF95883F);
+			hge->Gfx_RenderLine(u0+0.5f, v0+0.5f, u1,      v0+0.5f, ARGB(0xFF,0x95,0x88,0x3F));
+			hge->Gfx_RenderLine(u1,      v0+0.5f, u1,      v1,      ARGB(0xFF,0x95,0x88,0x3F));
+			hge->Gfx_RenderLine(u1,      v1,      u0+0.5f, v1,      ARGB(0xFF,0x95,0x88,0x3F));
+			hge->Gfx_RenderLine(u0+0.5f, v1,      u0+0.5f, v0+0.5f, ARGB(0xFF,0x95,0x88,0x3F));
 		}
 
 	sprintf(szTemp,"Texture size: %dx%d",(int)sprFont->GetWidth(),(int)sprFont->GetHeight());
@@ -106,10 +106,10 @@ bool RenderFunc()
 		if(state.mx>=u0 && state.mx<u1 &&
 			state.my>=v0 && state.my<v1)
 		{
-			hge->Gfx_RenderLine(u0+0.5f, v0+0.5f, u1,      v0+0.5f, 0xFFFF0000);
-			hge->Gfx_RenderLine(u1,      v0+0.5f, u1,      v1,      0xFFFF0000);
-			hge->Gfx_RenderLine(u1,      v1,      u0+0.5f, v1,      0xFFFF0000);
-			hge->Gfx_RenderLine(u0+0.5f, v1,      u0+0.5f, v0+0.5f, 0xFFFF0000);
+			hge->Gfx_RenderLine(u0+0.5f, v0+0.5f, u1,      v0+0.5f, ARGB(0xFF,0xFF,0x00,0x00));
+			hge->Gfx_RenderLine(u1,      v0+0.5f, u1,      v1,      ARGB(0xFF,0xFF,0x00,0x00));
+			hge->Gfx_RenderLine(u1,      v1,      u0+0.5f, v1,      ARGB(0xFF,0xFF,0x00,0x00));
+			hge->Gfx_RenderLine(u0+0.5f, v1,      u0+0.5f, v0+0.5f, ARGB(0xFF,0xFF,0x00,0x00));
 
 			if(i>=32 && i<=126)
 				sprintf(szTemp,"\"%c\" = x:%d y:%d w:%d h:%d  a:%d c:%d",
@@ -131,7 +131,7 @@ bool RenderFunc()
 
 	if(state.bHelp)
 	{
-		fnt->SetColor(0xFFFFFFFF);
+		fnt->SetColor(ARGB(0xFF,0xFF,0xFF,0xFF));
 		fnt->Render(189, 18, HGETEXT_LEFT, "Left mouse button - drag font texture\n"
 			"Typefaces listbox - use Up/Down arrows, Mouse wheel\n"
 			"Characters range - click and drag\n"
@@ -208,7 +208,7 @@ void InitEditor()
 
 	sprCursor=new hgeSprite(texGui, 487, 181, 19, 26);
 	sprBlack=new hgeSprite(0,0,0,100,100);
-	sprBlack->SetColor(0xFF000000);
+	sprBlack->SetColor(ARGB(0xFF,0x00,0x00,0x00));
 
 	sprLeftPane1=new hgeSprite(texGui, 0, 0, 168, 512);
 	sprLeftPane2=new hgeSprite(texGui, 336, 0, 168, 88);

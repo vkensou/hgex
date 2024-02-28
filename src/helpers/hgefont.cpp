@@ -44,7 +44,7 @@ hgeFont::hgeFont(const char *szFont, bool bMipmap)
 
 	fZ=0.5f;
 	nBlend=BLEND_COLORMUL | BLEND_ALPHABLEND | BLEND_NOZWRITE;
-	dwCol=0xFFFFFFFF;
+	dwCol=ARGB(0xFF,0xFF,0xFF,0xFF);
 
 	ZeroMemory( &letters, sizeof(letters) );
 	ZeroMemory( &pre, sizeof(pre) );

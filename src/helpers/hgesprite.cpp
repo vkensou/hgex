@@ -59,7 +59,7 @@ hgeSprite::hgeSprite(HTEXTURE texture, float texx, float texy, float w, float h)
 	quad.v[0].col = 
 	quad.v[1].col = 
 	quad.v[2].col = 
-	quad.v[3].col = 0xffffffff;
+	quad.v[3].col = ARGB(0xFF,0xFF,0xFF,0xFF);
 
 	quad.blend=BLEND_DEFAULT;
 }

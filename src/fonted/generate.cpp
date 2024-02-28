@@ -158,7 +158,7 @@ graphics.DrawString(string2, -1, &font, PointF(10.0f, 60.0f), &solidBrush);
 		for (j=0; j<nWidth; j++)
 		{
 			dwPixel = pPixels[i*nWidth+j];
-			dwPixel = 0xFFFFFF | ((dwPixel & 0xFF) << 24);
+			dwPixel = ARGB(((dwPixel & 0xFF)),0xFF,0xFF,0xFF);
 			pTexData[i*nWidth+j] = dwPixel;
 		}
 	}

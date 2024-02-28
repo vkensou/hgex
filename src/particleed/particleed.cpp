@@ -91,14 +91,14 @@ bool RenderFunc()
 		sprRightPane2->Render(632,512);
 		
 		gui->Render();
-		sprParticles->SetColor(state.ps->info.colColorStart.GetHWColor() | 0xFF000000);
+		sprParticles->SetColor(state.ps->info.colColorStart.GetHWColor() | ARGB(0xFF,0x00,0x00,0x00));
 		sprParticles->Render(26,189);
 		sprColor->Render(642,221);
 	}
 
 	if(state.bHelp)
 	{
-		fnt->SetColor(0xFFFFFFFF);
+		fnt->SetColor(ARGB(0xFF,0xFF,0xFF,0xFF));
 		fnt->Render(189, 18, HGETEXT_LEFT, "Left mouse button - fire particle system\n"
 			"Right mouse button - move the system with mouse\n\n"
 			"Keys 1 to 9 - select preset\nPresets are saved and loaded automatically\n\n"
@@ -163,7 +163,7 @@ void InitEditor()
 		if (state.texBG)
 		{
 			state.sprBG = new hgeSprite(state.texBG, 0, 0, (float)bgw, (float)bgh);
-			state.sprBG->SetHotSpot((float)bgw / 2, (float)bgh / 2);
+			state.sprBG->SetHotSpot((float)bgw/2, (float)bgh/2);
 		}
 	}
 
