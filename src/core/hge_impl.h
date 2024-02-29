@@ -123,6 +123,7 @@ struct DescriptorSetKeyHash
 void DInit();
 void DDone();
 bool DFrame();
+bool DRender();
 
 
 /*

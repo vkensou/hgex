@@ -205,11 +205,15 @@ bool DFrame() {
 	dquad.v[2].col=col;
 	dquad.v[3].col=col;
 
+
+	return false;
+}
+
+bool DRender() {
 	pHGE->Gfx_BeginScene();
 	pHGE->Gfx_Clear(0);
 	pHGE->Gfx_RenderQuad(&dquad);
 	pHGE->Gfx_EndScene();
-
 	return false;
 }
 

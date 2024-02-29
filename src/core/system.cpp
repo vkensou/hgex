@@ -189,7 +189,7 @@ bool CALL HGE_Impl::System_Initiate()
 		rfunc=(bool(*)())pHGE->System_GetStateFunc(HGE_RENDERFUNC);
 		hwndTmp=hwndParent; hwndParent=0;
 		pHGE->System_SetStateFunc(HGE_FRAMEFUNC, DFrame);
-		pHGE->System_SetStateFunc(HGE_RENDERFUNC, 0);
+		pHGE->System_SetStateFunc(HGE_RENDERFUNC, DRender);
 		DInit();
 		pHGE->System_Start();
 		DDone();
