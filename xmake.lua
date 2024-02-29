@@ -3,7 +3,21 @@ add_cxflags("/EHsc")
 add_cxflags("/permissive")
 set_languages("cxx20")
 
+package("cgpu")
+    add_urls("https://github.com/vkensou/cgpu.git")
+    add_versions("latest", "develop")
+
+    add_deps("spirv-reflect")
+
+    on_install(function(package)
+        import("package.tools.xmake").install(package, {}, {target="cgpu"})
+    end)
+package_end()
+
 add_requires("minizip", "libpng")
+add_requires("cgpu")
+add_requires("freeimage")
+add_requires("glm")
 
 target("bass")
     set_kind("headeronly")
@@ -22,11 +36,15 @@ target("hgex")
 
     add_deps("bass")
     add_packages("minizip")
+    add_packages("cgpu")
+    add_packages("freeimage")
+    add_packages("glm")
+    add_rules("utils.hlsl2spv", {bin2c = true})
 
     add_defines("HGEDLL")
 
     if (is_os("windows")) then
-        add_syslinks("user32", "shell32", "gdi32", "winmm")
+        add_syslinks("user32", "shell32", "gdi32", "winmm", "advapi32")
     end
 
     if (is_os("windows")) then
@@ -45,6 +63,7 @@ target("hgex")
     add_includedirs("include", {public = true})
     add_headerfiles("include/hge.h")
     add_files("src/core/*.cpp")
+    add_files("src/core/*.hlsl")
 
 target("hgexhelpers")
     set_kind("static")

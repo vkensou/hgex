@@ -230,20 +230,32 @@ void hgeParticleSystem::Stop(bool bKillParticles)
 void hgeParticleSystem::Render()
 {
 	int i;
+	int	bi;
 	DWORD col;
 	hgeParticle *par=particles;
 
 	col=info.sprite->GetColor();
 
-	for(i=0; i<nParticlesAlive; i++)
+	int max_prim;
+	hgeVertex* recordBuffer = hge->Gfx_StartBatch(HGEPRIM_QUADS, info.sprite->GetTexture(), info.sprite->GetBlendMode(), &max_prim);
+	for(i=0,bi=0; i<nParticlesAlive; i++)
 	{
 		if(info.colColorStart.r < 0)
 			info.sprite->SetColor(SETA(info.sprite->GetColor(),par->colColor.a*255));
 		else
 			info.sprite->SetColor(par->colColor.GetHWColor());
-		info.sprite->RenderEx(par->vecLocation.x*fScale+fTx, par->vecLocation.y*fScale+fTy, par->fSpin*par->fAge, par->fSize*fScale);
+		if (bi == max_prim)
+		{
+			hge->Gfx_FinishBatch(bi);
+			recordBuffer = hge->Gfx_StartBatch(HGEPRIM_QUADS, info.sprite->GetTexture(), info.sprite->GetBlendMode(), &max_prim);
+			bi = 0;
+		}
+		info.sprite->RenderEx(par->vecLocation.x*fScale+fTx, par->vecLocation.y*fScale+fTy, par->fSpin*par->fAge, par->fSize*fScale, 0, recordBuffer);
+		recordBuffer += HGEPRIM_QUADS;
+		bi++;
 		par++;
 	}
+	hge->Gfx_FinishBatch(bi);
 
 	info.sprite->SetColor(col);
 }

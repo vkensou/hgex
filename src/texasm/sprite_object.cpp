@@ -61,7 +61,7 @@ bool CSpriteObject::SaveDescription(FILE *fp, char *texname)
 	}
 
 	DWORD Color = spr->GetColor();
-	if(Color != 0xFFFFFFFF)
+	if(Color != ARGB(0xFF,0xFF,0xFF,0xFF))
 		fprintf(fp, " color = %08X\n", Color);
 
 	float ZOrder = spr->GetZ();

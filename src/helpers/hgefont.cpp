@@ -44,7 +44,7 @@ hgeFont::hgeFont(const char *szFont, bool bMipmap)
 
 	fZ=0.5f;
 	nBlend=BLEND_COLORMUL | BLEND_ALPHABLEND | BLEND_NOZWRITE;
-	dwCol=0xFFFFFFFF;
+	dwCol=ARGB(0xFF,0xFF,0xFF,0xFF);
 
 	ZeroMemory( &letters, sizeof(letters) );
 	ZeroMemory( &pre, sizeof(pre) );
@@ -141,11 +141,14 @@ void hgeFont::Render(float x, float y, int align, const char *string)
 {
 	int i;
 	float	fx=x;
+	int	bi = 0;
 
 	align &= HGETEXT_HORZMASK;
 	if(align==HGETEXT_RIGHT) fx-=GetStringWidth(string, false);
 	if(align==HGETEXT_CENTER) fx-=int(GetStringWidth(string, false)/2.0f);
 
+	int max_prim;
+	hgeVertex* recordBuffer = hge->Gfx_StartBatch(HGEPRIM_QUADS, hTexture, nBlend, &max_prim);
 	while(*string)
 	{
 		if(*string=='\n')
@@ -162,12 +165,21 @@ void hgeFont::Render(float x, float y, int align, const char *string)
 			if(letters[i])
 			{
 				fx += pre[i]*fScale*fProportion;
-				letters[i]->RenderEx(fx, y, fRot, fScale*fProportion, fScale);
+				if (bi == max_prim)
+				{
+					hge->Gfx_FinishBatch(bi);
+					recordBuffer = hge->Gfx_StartBatch(HGEPRIM_QUADS, hTexture, nBlend, &max_prim);
+					bi = 0;
+				}
+				letters[i]->RenderEx(fx, y, fRot, fScale*fProportion, fScale, recordBuffer);
+				recordBuffer += HGEPRIM_QUADS;
+				bi++;
 				fx += (letters[i]->GetWidth()+post[i]+fTracking)*fScale*fProportion;
 			}
 		}
 		string++;
 	}
+	hge->Gfx_FinishBatch(bi);
 }
 
 void hgeFont::printf(float x, float y, int align, const char *format, ...)

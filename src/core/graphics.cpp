@@ -8,746 +8,897 @@
 
 
 #include "hge_impl.h"
-#include <d3d9.h>
-#include <d3dx9.h>
+#include "FreeImage.h"
+#include "glm/gtc/matrix_transform.hpp"
+#include <span>
 
+void hge_graphicslog(void* user_data, ECGPULogSeverity severity, const char* fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	//vprintf(fmt, args);
+	size_t nLen = _vscprintf(fmt, args) + 1;
+	char* strBuffer = new char[nLen + 8];
+	_vsnprintf_s(strBuffer, nLen, nLen, fmt, args);
+	OutputDebugString(strBuffer);
+	va_end(args);
+}
+
+size_t malloced = 0;
+void *hge_graphicsmalloc(void *user_data, size_t size, const void *pool)
+{
+	if (size == 0)
+		return nullptr;
+
+	malloced += size;
+	return malloc(size);
+}
+
+void* hge_graphicsrealloc(void* user_data, void* ptr, size_t size, const void* pool)
+{
+	malloced -= ptr ? _msize(ptr) : 0;
+	malloced += size;
+	return realloc(ptr, size);
+}
+
+void* hge_graphicscalloc(void* user_data, size_t count, size_t size, const void* pool)
+{
+	if (count * size == 0)
+		return nullptr;
+
+	malloced += count * size;
+	return calloc(count, size);
+}
+
+void hge_graphicsfree(void *user_data, void *ptr, const void *pool)
+{
+	malloced -= ptr ? _msize(ptr) : 0;
+	free(ptr);
+}
+
+size_t aligned_malloced = 0;
+void *hge_graphicsmalloc_aligned(void *user_data, size_t size, size_t alignment, const void *pool)
+{
+	aligned_malloced += size;
+	return _aligned_malloc(size, alignment);
+}
+
+void *hge_graphicsrealloc_aligned(void *user_data, void *ptr, size_t size, size_t alignment, const void *pool)
+{
+	aligned_malloced -= ptr ? _aligned_msize(ptr, alignment, 0) : 0;
+	aligned_malloced += size;
+	return _aligned_realloc(ptr, size, alignment);
+}
+
+void *hge_graphicscalloc_aligned(void *user_data, size_t count, size_t size, size_t alignment, const void *pool)
+{
+	aligned_malloced += count * size;
+	void *memory = _aligned_malloc(count * size, alignment);
+	if (memory != NULL)
+		memset(memory, 0, count * size);
+	return memory;
+}
+
+void hge_graphicsfree_aligned(void *user_data, void *ptr, size_t alignment, const void *pool)
+{
+	aligned_malloced -= ptr ? _aligned_msize(ptr, alignment, 0) : 0;
+	_aligned_free(ptr);
+}
 
 void CALL HGE_Impl::Gfx_Clear(DWORD color)
 {
-	if(pCurTarget)
-	{
-		if(pCurTarget->pDepth)
-			pD3DDevice->Clear( 0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, color, 1.0f, 0 );
-		else
-			pD3DDevice->Clear( 0, NULL, D3DCLEAR_TARGET, color, 1.0f, 0 );
-	}
-	else
-	{
-		if(bZBuffer)
-			pD3DDevice->Clear( 0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, color, 1.0f, 0 );
-		else
-			pD3DDevice->Clear( 0, NULL, D3DCLEAR_TARGET, color, 1.0f, 0 );
-	}
+	if (prepared)
+		return;
+
+	auto &cur_frame_data = frame_datas[current_frame_index];
+	auto &cur_swapchain_info = swapchain_infos[current_swapchain_index];
+
+	const CGPUClearValue clearColor = {
+		.color = {GETR(color) / 255.0f, GETG(color) / 255.0f, GETB(color) / 255.0f, 1},
+		.is_color = true,
+	};
+
+	CGPUBeginRenderPassInfo begin_info = {
+		.render_pass = render_pass,
+		.framebuffer = cur_swapchain_info.framebuffer,
+		.clear_value_count = 1,
+		.clear_values = &clearColor,
+	};
+
+	cur_rp_encoder = cgpu_cmd_begin_render_pass(cur_cmd, &begin_info);
+
+	cgpu_render_encoder_set_viewport(cur_rp_encoder,
+									 0.0f, 0.0f,
+									 (float)nScreenWidth, (float)nScreenHeight,
+									 0.f, 1.f);
+	cgpu_render_encoder_set_scissor(cur_rp_encoder, 0, 0, nScreenWidth, nScreenHeight);
+
+	prepared = true;
 }
 
 void CALL HGE_Impl::Gfx_SetClipping(int x, int y, int w, int h)
-{
-	D3DVIEWPORT9 vp;
-	int scr_width, scr_height;
+{ 
 
-	if(!pCurTarget) {
-		scr_width=pHGE->System_GetStateInt(HGE_SCREENWIDTH);
-		scr_height=pHGE->System_GetStateInt(HGE_SCREENHEIGHT);
-	}
-	else {
-		scr_width=Texture_GetWidth((HTEXTURE)pCurTarget->pTex);
-		scr_height=Texture_GetHeight((HTEXTURE)pCurTarget->pTex);
-	}
-
-	if(!w) {
-		vp.X=0;
-		vp.Y=0;
-		vp.Width=scr_width;
-		vp.Height=scr_height;
-	}
-	else
-	{
-		if(x<0) { w+=x; x=0; }
-		if(y<0) { h+=y; y=0; }
-
-		if(x+w > scr_width) w=scr_width-x;
-		if(y+h > scr_height) h=scr_height-y;
-
-		vp.X=x;
-		vp.Y=y;
-		vp.Width=w;
-		vp.Height=h;
-	}
-
-	vp.MinZ=0.0f;
-	vp.MaxZ=1.0f;
-
-	_render_batch();
-	pD3DDevice->SetViewport(&vp);
-
-	D3DXMATRIX tmp;
-	D3DXMatrixScaling(&matProj, 1.0f, -1.0f, 1.0f);
-	D3DXMatrixTranslation(&tmp, -0.5f, +0.5f, 0.0f);
-	D3DXMatrixMultiply(&matProj, &matProj, &tmp);
-	D3DXMatrixOrthoOffCenterLH(&tmp, (float)vp.X, (float)(vp.X+vp.Width), -((float)(vp.Y+vp.Height)), -((float)vp.Y), vp.MinZ, vp.MaxZ);
-	D3DXMatrixMultiply(&matProj, &matProj, &tmp);
-	pD3DDevice->SetTransform(D3DTS_PROJECTION, &matProj);
 }
 
 void CALL HGE_Impl::Gfx_SetTransform(float x, float y, float dx, float dy, float rot, float hscale, float vscale)
 {
-	D3DXMATRIX tmp;
+	_render_batch();
 
-	if(vscale==0.0f) D3DXMatrixIdentity(&matView);
+	if (vscale == 0.0f) matView = glm::identity<glm::mat4>();
 	else
 	{
-		D3DXMatrixTranslation(&matView, -x, -y, 0.0f);
-		D3DXMatrixScaling(&tmp, hscale, vscale, 1.0f);
-		D3DXMatrixMultiply(&matView, &matView, &tmp);
-		D3DXMatrixRotationZ(&tmp, -rot);
-		D3DXMatrixMultiply(&matView, &matView, &tmp);
-		D3DXMatrixTranslation(&tmp, x+dx, y+dy, 0.0f);
-		D3DXMatrixMultiply(&matView, &matView, &tmp);
+		matView = glm::translate(glm::mat4(), glm::vec3(- x, -y, 0.0f));
+		auto tmp = glm::scale(glm::mat4(), glm::vec3(hscale, vscale, 1.0f));
+		matView = matView * tmp;
+		tmp = glm::rotate(glm::mat4(), -rot, glm::vec3(0.0f, 0.0f, 1));
+		matView = matView * tmp;
+		tmp = glm::translate(glm::mat4(), glm::vec3(x + dx, y + dy, 0.0f));
+		matView = matView * tmp;
 	}
 
-	_render_batch();
-	pD3DDevice->SetTransform(D3DTS_VIEW, &matView);
+	// TODO
 }
 
 bool CALL HGE_Impl::Gfx_BeginScene(HTARGET targ)
 {
-	LPDIRECT3DSURFACE9 pSurf=0, pDepth=0;
-	D3DDISPLAYMODE Mode;
-	CRenderTargetList *target=(CRenderTargetList *)targ;
+	auto& cur_frame_data = frame_datas[current_frame_index];
+	auto& cur_swapchain_info = swapchain_infos[current_swapchain_index];
 
-	HRESULT hr = pD3DDevice->TestCooperativeLevel();
-	if (hr == D3DERR_DEVICELOST) return false;
-	else if (hr == D3DERR_DEVICENOTRESET)
-	{
-		if(bWindowed)
-		{
-			if(FAILED(pD3D->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &Mode)) || Mode.Format==D3DFMT_UNKNOWN) 
-			{
-				_PostError("Can't determine desktop video mode");
-				return false;
-			}
+	auto back_buffer = cur_swapchain_info.texture;
+	auto back_buffer_view = cur_swapchain_info.texture_view;
+	auto prepared_semaphore = cur_frame_data.prepared_semaphore;
 
-			d3dppW.BackBufferFormat = Mode.Format;
-			if(_format_id(Mode.Format) < 4) nScreenBPP=16;
-			else nScreenBPP=32;
-		}
+	cur_cmd = _RequestCmd(cur_frame_data);
+	cgpu_cmd_begin(cur_cmd);
 
-	    if(!_GfxRestore()) return false; 
-	}
-    
-	if(VertArray)
-	{
-		_PostError("Gfx_BeginScene: Scene is already being rendered");
-		return false;
-	}
-	
-	if(target != pCurTarget)
-	{
-		if(target)
-		{
-			target->pTex->GetSurfaceLevel(0, &pSurf);
-			pDepth=target->pDepth;
-		}
-		else
-		{
-			pSurf=pScreenSurf;
-			pDepth=pScreenDepth;
-		}
-		if(FAILED(pD3DDevice->SetRenderTarget( 0, pSurf)))
-		{
-			if(target) pSurf->Release();
-			_PostError("Gfx_BeginScene: Can't set render target");
-			return false;
-		}
-		if(target)
-		{
-			pSurf->Release();
-			if(target->pDepth) pD3DDevice->SetRenderState( D3DRS_ZENABLE, D3DZB_TRUE ); 
-			else pD3DDevice->SetRenderState( D3DRS_ZENABLE, D3DZB_FALSE ); 
-			_SetProjectionMatrix(target->width, target->height);
-		}
-		else
-		{
-			if(bZBuffer) pD3DDevice->SetRenderState( D3DRS_ZENABLE, D3DZB_TRUE ); 
-			else pD3DDevice->SetRenderState( D3DRS_ZENABLE, D3DZB_FALSE );
-			_SetProjectionMatrix(nScreenWidth, nScreenHeight);
-		}
-
-		pD3DDevice->SetTransform(D3DTS_PROJECTION, &matProj);
-		D3DXMatrixIdentity(&matView);
-		pD3DDevice->SetTransform(D3DTS_VIEW, &matView);
-
-		pCurTarget=target;
-	}
-
-	pD3DDevice->BeginScene();
-	pVB->Lock( 0, 0, (void**)&VertArray, 0 );
+	CGPUTextureBarrier draw_barrier = {
+		.texture = back_buffer,
+		.src_state = CGPU_RESOURCE_STATE_UNDEFINED,
+		.dst_state = CGPU_RESOURCE_STATE_RENDER_TARGET};
+	CGPUResourceBarrierDescriptor barrier_desc0 = {.texture_barriers = &draw_barrier, .texture_barriers_count = 1};
+	cgpu_cmd_resource_barrier(cur_cmd, &barrier_desc0);
 
 	return true;
 }
 
 void CALL HGE_Impl::Gfx_EndScene()
 {
-	_render_batch(true);
-	pD3DDevice->EndScene();
-	if(!pCurTarget) pD3DDevice->Present( NULL, NULL, NULL, NULL );
+	auto &cur_frame_data = frame_datas[current_frame_index];
+	auto &cur_swapchain_info = swapchain_infos[current_swapchain_index];
+
+	if (prepared)
+	{
+		_render_batch(true);
+
+		cgpu_cmd_end_render_pass(cur_cmd, cur_rp_encoder);
+	}
+
+	auto back_buffer = cur_swapchain_info.texture;
+	auto back_buffer_view = cur_swapchain_info.texture_view;
+	auto prepared_semaphore = cur_frame_data.prepared_semaphore;
+
+	CGPUTextureBarrier present_barrier = {
+		.texture = back_buffer,
+		.src_state = CGPU_RESOURCE_STATE_RENDER_TARGET,
+		.dst_state = CGPU_RESOURCE_STATE_PRESENT};
+	CGPUResourceBarrierDescriptor barrier_desc1 = {.texture_barriers = &present_barrier, .texture_barriers_count = 1};
+	cgpu_cmd_resource_barrier(cur_cmd, &barrier_desc1);
+
+	cgpu_cmd_end(cur_cmd);
 }
 
 void CALL HGE_Impl::Gfx_RenderLine(float x1, float y1, float x2, float y2, DWORD color, float z)
 {
-	if(VertArray)
+	if (!prepared)
+		Gfx_Clear(0);
+
+	if (VertArray)
 	{
-		if(CurPrimType!=HGEPRIM_LINES || nPrim>=VERTEX_BUFFER_SIZE/HGEPRIM_LINES || CurTexture || CurBlendMode!=BLEND_DEFAULT)
+		if (CurPrimType != HGEPRIM_LINES || cur_vertex_buffer->vb_eaten + HGEPRIM_LINES > VERTEX_BUFFER_SIZE || CurTexture || CurBlendMode != BLEND_DEFAULT)
 		{
 			_render_batch();
 
-			CurPrimType=HGEPRIM_LINES;
-			if(CurBlendMode != BLEND_DEFAULT) _SetBlendMode(BLEND_DEFAULT);
-			if(CurTexture) { pD3DDevice->SetTexture(0, 0); CurTexture=0; }
+			CurPrimType = HGEPRIM_LINES;
+			if (CurBlendMode != BLEND_DEFAULT) _SetBlendMode(BLEND_DEFAULT);
+			if (CurTexture)
+			{
+				CurTexture = 0;
+			}
 		}
 
-		int i=nPrim*HGEPRIM_LINES;
-		VertArray[i].x = x1; VertArray[i+1].x = x2;
-		VertArray[i].y = y1; VertArray[i+1].y = y2;
-		VertArray[i].z     = VertArray[i+1].z = z;
-		VertArray[i].col   = VertArray[i+1].col = color;
-		VertArray[i].tx    = VertArray[i+1].tx =
-		VertArray[i].ty    = VertArray[i+1].ty = 0.0f;
+		int i = nPrim * HGEPRIM_LINES;
+		hgeVertex line[2];
+		line[0].x = x1; line[1].x = x2;
+		line[0].y = y1; line[1].y = y2;
+		line[0].z = line[1].z = z;
+		line[0].col = line[1].col = color;
+		line[0].tx = line[1].tx =
+			line[0].ty = line[1].ty = 0.0f;
 
-		nPrim++;
+		_UploadVertexData(line);
 	}
 }
 
 void CALL HGE_Impl::Gfx_RenderTriple(const hgeTriple *triple)
 {
-	if(VertArray)
+	if (!prepared)
+		Gfx_Clear(0);
+
+	if (VertArray)
 	{
-		if(CurPrimType!=HGEPRIM_TRIPLES || nPrim>=VERTEX_BUFFER_SIZE/HGEPRIM_TRIPLES || CurTexture!=triple->tex || CurBlendMode!=triple->blend)
+		if (CurPrimType != HGEPRIM_TRIPLES || cur_vertex_buffer->vb_eaten + HGEPRIM_TRIPLES > VERTEX_BUFFER_SIZE || CurTexture != triple->tex || CurBlendMode != triple->blend)
 		{
 			_render_batch();
 
-			CurPrimType=HGEPRIM_TRIPLES;
-			if(CurBlendMode != triple->blend) _SetBlendMode(triple->blend);
-			if(triple->tex != CurTexture) {
-				pD3DDevice->SetTexture( 0, (LPDIRECT3DTEXTURE9)triple->tex );
+			CurPrimType = HGEPRIM_TRIPLES;
+			if (CurBlendMode != triple->blend) _SetBlendMode(triple->blend);
+			if (triple->tex != CurTexture) {
 				CurTexture = triple->tex;
 			}
 		}
 
-		memcpy(&VertArray[nPrim*HGEPRIM_TRIPLES], triple->v, sizeof(hgeVertex)*HGEPRIM_TRIPLES);
-		nPrim++;
+		_UploadVertexData(triple->v);
 	}
 }
 
 void CALL HGE_Impl::Gfx_RenderQuad(const hgeQuad *quad)
 {
-	if(VertArray)
+	if (!prepared)
+		Gfx_Clear(0);
+
+	if (VertArray)
 	{
-		if(CurPrimType!=HGEPRIM_QUADS || nPrim>=VERTEX_BUFFER_SIZE/HGEPRIM_QUADS || CurTexture!=quad->tex || CurBlendMode!=quad->blend)
+		if (CurPrimType != HGEPRIM_QUADS || cur_vertex_buffer->vb_eaten + HGEPRIM_QUADS > VERTEX_BUFFER_SIZE || CurTexture != quad->tex || CurBlendMode != quad->blend)
 		{
 			_render_batch();
 
-			CurPrimType=HGEPRIM_QUADS;
-			if(CurBlendMode != quad->blend) _SetBlendMode(quad->blend);
-			if(quad->tex != CurTexture)
+			CurPrimType = HGEPRIM_QUADS;
+			if (CurBlendMode != quad->blend) _SetBlendMode(quad->blend);
+			if (quad->tex != CurTexture)
 			{
-				pD3DDevice->SetTexture( 0, (LPDIRECT3DTEXTURE9)quad->tex );
 				CurTexture = quad->tex;
 			}
 		}
 
-		memcpy(&VertArray[nPrim*HGEPRIM_QUADS], quad->v, sizeof(hgeVertex)*HGEPRIM_QUADS);
-		nPrim++;
+		_UploadVertexData(quad->v);
 	}
 }
 
 hgeVertex* CALL HGE_Impl::Gfx_StartBatch(int prim_type, HTEXTURE tex, int blend, int *max_prim)
 {
-	if(VertArray)
-	{
-		_render_batch();
+	if (!prepared)
+		Gfx_Clear(0);
 
-		CurPrimType=prim_type;
-		if(CurBlendMode != blend) _SetBlendMode(blend);
-		if(tex != CurTexture)
+	if (VertArray)
+	{
+		if (CurPrimType != prim_type || cur_vertex_buffer->vb_eaten + prim_type > VERTEX_BUFFER_SIZE || CurTexture != tex || CurBlendMode != blend)
 		{
-			pD3DDevice->SetTexture( 0, (LPDIRECT3DTEXTURE9)tex );
-			CurTexture = tex;
+			_render_batch();
+
+			CurPrimType = HGEPRIM_QUADS;
+			if (CurBlendMode != blend) _SetBlendMode(blend);
+			if (tex != CurTexture)
+			{
+				CurTexture = tex;
+			}
 		}
 
-		*max_prim=VERTEX_BUFFER_SIZE / prim_type;
-		return VertArray;
+		*max_prim = (VERTEX_BUFFER_SIZE - cur_vertex_buffer->vb_eaten) / CurPrimType;
+		if (*max_prim == 0)
+		{
+			_ExpandVertexBuffer();
+			*max_prim = (VERTEX_BUFFER_SIZE - cur_vertex_buffer->vb_eaten) / CurPrimType;
+		}
+		return VertArray + nPrim * CurPrimType;
 	}
-	else return 0;
+	return 0;
 }
 
 void CALL HGE_Impl::Gfx_FinishBatch(int nprim)
 {
-	nPrim=nprim;
+	int vertex_eat = nprim * CurPrimType, index_eat = nprim * (CurPrimType == HGEPRIM_QUADS ? 6 : 0);
+	nPrim += nprim;
+	cur_vertex_buffer->vb_eaten += vertex_eat;
+	cur_vertex_buffer->ib_eaten += index_eat;
 }
 
 HTARGET CALL HGE_Impl::Target_Create(int width, int height, bool zbuffer)
 {
-	CRenderTargetList *pTarget;
-	D3DSURFACE_DESC TDesc;
-
-	pTarget = new CRenderTargetList;
-	pTarget->pTex=0;
-	pTarget->pDepth=0;
-
-	if(FAILED(D3DXCreateTexture(pD3DDevice, width, height, 1, D3DUSAGE_RENDERTARGET,
-						d3dpp->BackBufferFormat, D3DPOOL_DEFAULT, &pTarget->pTex)))
-	{
-		_PostError("Can't create render target texture");
-		delete pTarget;
-		return 0;
-	}
-
-	pTarget->pTex->GetLevelDesc(0, &TDesc);
-	pTarget->width=TDesc.Width;
-	pTarget->height=TDesc.Height;
-
-	if(zbuffer)
-	{
-		if(FAILED(pD3DDevice->CreateDepthStencilSurface(pTarget->width, pTarget->height,
-						D3DFMT_D16, D3DMULTISAMPLE_NONE, 0, FALSE, &pTarget->pDepth, NULL )))
-		{   
-			pTarget->pTex->Release();
-			_PostError("Can't create render target depth buffer");
-			delete pTarget;
-			return 0;
-		}
-	}
-
-	pTarget->next=pTargets;
-	pTargets=pTarget;
-
-	return (HTARGET)pTarget;
+	return 0;
 }
 
 void CALL HGE_Impl::Target_Free(HTARGET target)
 {
-	CRenderTargetList *pTarget=pTargets, *pPrevTarget=NULL;
 
-	while(pTarget)
-	{
-		if((CRenderTargetList *)target == pTarget)
-		{
-			if(pPrevTarget)
-				pPrevTarget->next = pTarget->next;
-			else
-				pTargets = pTarget->next;
-
-			if(pTarget->pTex) pTarget->pTex->Release();
-			if(pTarget->pDepth) pTarget->pDepth->Release();
-
-			delete pTarget;
-			return;
-		}
-
-		pPrevTarget = pTarget;
-		pTarget = pTarget->next;
-	}
 }
 
 HTEXTURE CALL HGE_Impl::Target_GetTexture(HTARGET target)
 {
-	CRenderTargetList *targ=(CRenderTargetList *)target;
-	if(target) return (HTEXTURE)targ->pTex;
-	else return 0;
+	return 0;
 }
 
 HTEXTURE CALL HGE_Impl::Texture_Create(int width, int height)
 {
-	LPDIRECT3DTEXTURE9 pTex;
+	CGPUTextureDescriptor texture_desc =
+	{
+		.flags = CGPU_TCF_FORCE_2D,
+		.width = (uint64_t)width,
+		.height = (uint64_t)height,
+		.depth = 1,
+		.array_size = 1,
+		.format = CGPU_FORMAT_R8G8B8A8_UNORM,
+		.mip_levels = 1,
+		.owner_queue = gfx_queue,
+		.start_state = CGPU_RESOURCE_STATE_COPY_DEST,
+		.descriptors = CGPU_RESOURCE_TYPE_TEXTURE,
+	};
 
-	if( FAILED( D3DXCreateTexture( pD3DDevice, width, height,
-										1,					// Mip levels
-										0,					// Usage
-										D3DFMT_A8R8G8B8,	// Format
-										D3DPOOL_MANAGED,	// Memory pool
-										&pTex ) ) )
-	{	
-		_PostError("Can't create texture");
-		return NULL;
+	auto texture = cgpu_create_texture(device, &texture_desc);
+
+	CGPUTextureViewDescriptor view_desc = {
+		.texture = texture,
+		.format = texture->info->format,
+		.usages = CGPU_TVU_SRV,
+		.aspects = CGPU_TVA_COLOR,
+	};
+	auto texture_view = cgpu_create_texture_view(device, &view_desc);
+
+	auto texItem = new CTextureList;
+	texItem->tex = texture;
+	texItem->tex_view = texture_view;
+	texItem->locked = NULL;
+	texItem->next = textures;
+	textures = texItem;
+
+	return (HTEXTURE)texItem;
+}
+
+static void SwizzleFIBitmapDataToRGBA32(uint8_t* bits, int width, int height, int pitch)
+{
+	for (int y = 0; y < height; ++y)
+	{
+		uint32_t* pixel = (uint32_t*)bits;
+		for (int x = 0; x < width; x++)
+		{
+			uint32_t c = pixel[x];
+			pixel[x] = (((c & FI_RGBA_ALPHA_MASK) >> FI_RGBA_ALPHA_SHIFT) << 24)
+				+ (((c & FI_RGBA_RED_MASK) >> FI_RGBA_RED_SHIFT) << 0)
+				+ (((c & FI_RGBA_GREEN_MASK) >> FI_RGBA_GREEN_SHIFT) << 8)
+				+ (((c & FI_RGBA_BLUE_MASK) >> FI_RGBA_BLUE_SHIFT) << 16);
+		}
+		bits += pitch;
 	}
-
-	return (HTEXTURE)pTex;
 }
 
 HTEXTURE CALL HGE_Impl::Texture_Load(const char *filename, DWORD size, bool bMipmap)
 {
-	void *data;
+	void* data;
 	DWORD _size;
-	D3DFORMAT fmt1, fmt2;
-	LPDIRECT3DTEXTURE9 pTex;
-	D3DXIMAGE_INFO info;
-	CTextureList *texItem;
+	CTextureList* texItem;
 
-	if(size) { data=(void *)filename; _size=size; }
+	if (size) { data = (void*)filename; _size = size; }
 	else
 	{
-		data=pHGE->Resource_Load(filename, &_size);
-		if(!data) return NULL;
+		data = pHGE->Resource_Load(filename, &_size);
+		if (!data) return NULL;
 	}
 
-	if(*(DWORD*)data == 0x20534444) // Compressed DDS format magic number
+	FIMEMORY* memory = FreeImage_OpenMemory((BYTE*)data, _size);
+	if (!memory)
+		return NULL;
+	auto fiformat = FreeImage_GetFileTypeFromMemory(memory, _size);
+	if (fiformat == FIF_UNKNOWN)
 	{
-		fmt1=D3DFMT_UNKNOWN;
-		fmt2=D3DFMT_A8R8G8B8;
-	}
-	else
-	{
-		fmt1=D3DFMT_A8R8G8B8;
-		fmt2=D3DFMT_UNKNOWN;
-	}
-
-//	if( FAILED( D3DXCreateTextureFromFileInMemory( pD3DDevice, data, _size, &pTex ) ) ) pTex=NULL;
-	if( FAILED( D3DXCreateTextureFromFileInMemoryEx( pD3DDevice, data, _size,
-										D3DX_DEFAULT, D3DX_DEFAULT,
-										bMipmap ? 0:1,		// Mip levels
-										0,					// Usage
-										fmt1,				// Format
-										D3DPOOL_MANAGED,	// Memory pool
-										D3DX_FILTER_NONE,	// Filter
-										D3DX_DEFAULT,		// Mip filter
-										0,					// Color key
-										&info, NULL,
-										&pTex ) ) )
-
-	if( FAILED( D3DXCreateTextureFromFileInMemoryEx( pD3DDevice, data, _size,
-										D3DX_DEFAULT, D3DX_DEFAULT,
-										bMipmap ? 0:1,		// Mip levels
-										0,					// Usage
-										fmt2,				// Format
-										D3DPOOL_MANAGED,	// Memory pool
-										D3DX_FILTER_NONE,	// Filter
-										D3DX_DEFAULT,		// Mip filter
-										0,					// Color key
-										&info, NULL,
-										&pTex ) ) )
-
-	{	
-		_PostError("Can't create texture");
-		if(!size) Resource_Free(data);
+		FreeImage_CloseMemory(memory);
 		return NULL;
 	}
+	auto png = FreeImage_LoadFromMemory(fiformat, memory, PNG_DEFAULT);
+	uint32_t bpp = FreeImage_GetBPP(png);
+	if (bpp != 32)
+	{
+		auto prev_png = png;
+		png = FreeImage_ConvertTo32Bits(prev_png);
+		FreeImage_Unload(prev_png);
+	}
+	bpp = FreeImage_GetBPP(png);
+	uint32_t width = FreeImage_GetWidth(png);
+	uint32_t height = FreeImage_GetHeight(png);
+	auto type = FreeImage_GetImageType(png);
+	uint32_t pitch = FreeImage_GetPitch(png);
+	auto bits = (uint8_t*)FreeImage_GetBits(png);
+	SwizzleFIBitmapDataToRGBA32(bits, width, height, pitch);
 
-	if(!size) Resource_Free(data);
-	
-	texItem=new CTextureList;
-	texItem->tex=(HTEXTURE)pTex;
-	texItem->width=info.Width;
-	texItem->height=info.Height;
-	texItem->next=textures;
-	textures=texItem;
+	texItem = (CTextureList*)Texture_Create(width, height);
 
-	return (HTEXTURE)pTex;
+	auto locked = (uint8_t*)Texture_Lock((HTEXTURE)texItem);
+	for (size_t i = 0; i < height; ++i)
+	{
+		memcpy((uint8_t*)locked + i * pitch, bits + i * pitch, pitch);
+	}
+	Texture_Unlock((HTEXTURE)texItem);
+
+	FreeImage_CloseMemory(memory);
+	if (!size) Resource_Free(data);
+
+	return (HTEXTURE)texItem;
 }
 
 void CALL HGE_Impl::Texture_Free(HTEXTURE tex)
 {
-	LPDIRECT3DTEXTURE9 pTex=(LPDIRECT3DTEXTURE9)tex;
-	CTextureList *texItem=textures, *texPrev=0;
+	CTextureList* pTextures = textures, * texPrev = 0;
+	auto texItem = (CTextureList*)tex;
 
-	while(texItem)
+	while (pTextures)
 	{
-		if(texItem->tex==tex)
+		if (pTextures == texItem)
 		{
-			if(texPrev) texPrev->next=texItem->next;
-			else textures=texItem->next;
-			delete texItem;
+			if (texPrev) texPrev->next = pTextures->next;
+			else textures = pTextures->next;
+			deleted_textures.push_back(std::make_tuple(pTextures->tex, pTextures->tex_view));
+			if (pTextures->locked) free(pTextures->locked);
+			delete pTextures;
 			break;
 		}
-		texPrev=texItem;
-		texItem=texItem->next;
+		texPrev = pTextures;
+		pTextures = pTextures->next;
 	}
-	if(pTex != NULL) pTex->Release();
 }
 
 int CALL HGE_Impl::Texture_GetWidth(HTEXTURE tex, bool bOriginal)
 {
-	D3DSURFACE_DESC TDesc;
-	LPDIRECT3DTEXTURE9 pTex=(LPDIRECT3DTEXTURE9)tex;
-	CTextureList *texItem=textures;
-
-	if(bOriginal)
-	{
-		while(texItem)
-		{
-			if(texItem->tex==tex) return texItem->width;
-			texItem=texItem->next;
-		}
-		return 0;
-	}
+	auto texItem = (CTextureList*)tex;
+	if (texItem)
+		return texItem->tex->info->width;
 	else
-	{
-		if(FAILED(pTex->GetLevelDesc(0, &TDesc))) return 0;
-		else return TDesc.Width;
-	}
+		return 0;
 }
 
 
 int CALL HGE_Impl::Texture_GetHeight(HTEXTURE tex, bool bOriginal)
 {
-	D3DSURFACE_DESC TDesc;
-	LPDIRECT3DTEXTURE9 pTex=(LPDIRECT3DTEXTURE9)tex;
-	CTextureList *texItem=textures;
-
-	if(bOriginal)
-	{
-		while(texItem)
-		{
-			if(texItem->tex==tex) return texItem->height;
-			texItem=texItem->next;
-		}
-		return 0;
-	}
+	auto texItem = (CTextureList*)tex;
+	if (texItem)
+		return texItem->tex->info->height;
 	else
-	{
-		if(FAILED(pTex->GetLevelDesc(0, &TDesc))) return 0;
-		else return TDesc.Height;
-	}
+		return 0;
 }
 
 
 DWORD * CALL HGE_Impl::Texture_Lock(HTEXTURE tex, bool bReadOnly, int left, int top, int width, int height)
 {
-	LPDIRECT3DTEXTURE9 pTex=(LPDIRECT3DTEXTURE9)tex;
-	D3DSURFACE_DESC TDesc;
-	D3DLOCKED_RECT TRect;
-	RECT region, *prec;
-	int flags;
-
-	pTex->GetLevelDesc(0, &TDesc);
-	if(TDesc.Format!=D3DFMT_A8R8G8B8 && TDesc.Format!=D3DFMT_X8R8G8B8) return 0;
-
-	if(width && height)
+	auto texItem = (CTextureList*)tex;
+	if (!texItem->locked)
 	{
-		region.left=left;
-		region.top=top;
-		region.right=left+width;
-		region.bottom=top+height;
-		prec=&region;
-	}
-	else prec=0;
-
-	if(bReadOnly) flags=D3DLOCK_READONLY;
-	else flags=0;
-
-	if(FAILED(pTex->LockRect(0, &TRect, prec, flags)))
-	{
-		_PostError("Can't lock texture");
-		return 0;
+		texItem->locked = (uint8_t*)malloc(texItem->tex->info->width * texItem->tex->info->height * 4);
 	}
 
-	return (DWORD *)TRect.pBits;
+	return (DWORD*)texItem->locked;
 }
-
 
 void CALL HGE_Impl::Texture_Unlock(HTEXTURE tex)
 {
-	LPDIRECT3DTEXTURE9 pTex=(LPDIRECT3DTEXTURE9)tex;
-	pTex->UnlockRect(0);
+	auto texItem = (CTextureList*)tex;
+	if (!texItem->locked)
+		return;
+
+	uint32_t width = texItem->tex->info->width;
+	uint32_t height = texItem->tex->info->height;
+	uint32_t bpp = 4;
+	uint32_t pitch = width * bpp;
+	CGPUCommandPoolDescriptor cmd_pool_desc = {};
+	CGPUCommandBufferDescriptor cmd_desc = {};
+	CGPUBufferDescriptor upload_buffer_desc = {};
+	upload_buffer_desc.name = u8"UploadBuffer";
+	upload_buffer_desc.flags = CGPU_BCF_PERSISTENT_MAP_BIT;
+	upload_buffer_desc.descriptors = CGPU_RESOURCE_TYPE_NONE;
+	upload_buffer_desc.memory_usage = CGPU_MEM_USAGE_CPU_ONLY;
+	upload_buffer_desc.size = pitch * height;
+	CGPUBufferId tex_upload_buffer = cgpu_create_buffer(device, &upload_buffer_desc);
+	{
+		for (size_t i = 0; i < height; ++i)
+		{
+			memcpy((uint8_t*)tex_upload_buffer->info->cpu_mapped_address + (height - i - 1) * pitch, texItem->locked + i * pitch, pitch);
+		}
+	}
+	auto cpy_cmd_pool = cgpu_create_command_pool(gfx_queue, &cmd_pool_desc);
+	auto cpy_cmd = cgpu_create_command_buffer(cpy_cmd_pool, &cmd_desc);
+	cgpu_cmd_begin(cpy_cmd);
+	CGPUBufferToTextureTransfer b2t = {};
+	b2t.src = tex_upload_buffer;
+	b2t.src_offset = 0;
+	b2t.dst = texItem->tex;
+	b2t.dst_subresource.mip_level = 0;
+	b2t.dst_subresource.base_array_layer = 0;
+	b2t.dst_subresource.layer_count = 1;
+	cgpu_cmd_transfer_buffer_to_texture(cpy_cmd, &b2t);
+	CGPUTextureBarrier srv_barrier = {};
+	srv_barrier.texture = texItem->tex;
+	srv_barrier.src_state = CGPU_RESOURCE_STATE_COPY_DEST;
+	srv_barrier.dst_state = CGPU_RESOURCE_STATE_SHADER_RESOURCE;
+	CGPUResourceBarrierDescriptor barrier_desc1 = {};
+	barrier_desc1.texture_barriers = &srv_barrier;
+	barrier_desc1.texture_barriers_count = 1;
+	cgpu_cmd_resource_barrier(cpy_cmd, &barrier_desc1);
+	cgpu_cmd_end(cpy_cmd);
+	CGPUQueueSubmitDescriptor cpy_submit = {};
+	cpy_submit.cmds = &cpy_cmd;
+	cpy_submit.cmds_count = 1;
+	cgpu_submit_queue(gfx_queue, &cpy_submit);
+	cgpu_wait_queue_idle(gfx_queue);
+	cgpu_free_command_buffer(cpy_cmd);
+	cgpu_free_command_pool(cpy_cmd_pool);
+	cgpu_free_buffer(tex_upload_buffer);
+
+	free(texItem->locked);
+	texItem->locked = NULL;
 }
 
 //////// Implementation ////////
 
+CVertexBufferList* createVertexBuffer(CGPUDeviceId device, uint32_t vertex_buffer_budget)
+{
+	uint64_t vb_size = vertex_buffer_budget * sizeof(hgeVertex);
+	CGPUBufferDescriptor vb_desc = {
+		.size = vb_size,
+		.name = u8"pVB",
+		.descriptors = CGPU_RESOURCE_TYPE_VERTEX_BUFFER,
+		.memory_usage = CGPU_MEM_USAGE_GPU_ONLY,
+		.flags = CGPU_BCF_HOST_VISIBLE,
+		.start_state = CGPU_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+	};
+	auto pVB = cgpu_create_buffer(device, &vb_desc);
+
+	CGPUBufferRange vb_range = { .offset = 0, .size = vb_size };
+	cgpu_map_buffer(pVB, &vb_range);
+
+	uint64_t ib_size = vertex_buffer_budget * 6 / 4 * sizeof(WORD);
+	CGPUBufferDescriptor ib_desc = {
+		.size = ib_size,
+		.name = u8"pIB",
+		.descriptors = CGPU_RESOURCE_TYPE_INDEX_BUFFER,
+		.memory_usage = CGPU_MEM_USAGE_GPU_ONLY,
+		.flags = CGPU_BCF_HOST_VISIBLE,
+		.start_state = CGPU_RESOURCE_STATE_INDEX_BUFFER,
+	};
+	auto pIB = cgpu_create_buffer(device, &ib_desc);
+
+	if (!pIB)
+	{
+		return false;
+	}
+
+	CGPUBufferRange ib_range = { .offset = 0, .size = ib_size };
+	cgpu_map_buffer(pIB, &ib_range);
+
+	WORD* pIndices = (WORD*)pIB->info->cpu_mapped_address, n = 0;
+	for (int i = 0; i < VERTEX_BUFFER_SIZE / 4; i++) {
+		*pIndices++ = n;
+		*pIndices++ = n + 1;
+		*pIndices++ = n + 2;
+		*pIndices++ = n + 2;
+		*pIndices++ = n + 3;
+		*pIndices++ = n;
+		n += 4;
+	}
+
+	cgpu_unmap_buffer(pIB);
+
+	auto vertexBuffer = new CVertexBufferList();
+	vertexBuffer->pVB = pVB;
+	vertexBuffer->pIB = pIB;
+	vertexBuffer->vb_eaten = 0;
+	vertexBuffer->ib_eaten = 0;
+	vertexBuffer->next = NULL;
+	return vertexBuffer;
+}
+
 void HGE_Impl::_render_batch(bool bEndScene)
 {
-	if(VertArray)
+	if (VertArray)
 	{
-		pVB->Unlock();
-		
-		if(nPrim)
+		const uint32_t vert_stride = sizeof(hgeVertex);
+		int vertex_eat = nPrim * CurPrimType, index_eat = nPrim * (CurPrimType == HGEPRIM_QUADS ? 6 : 0);
+		if (nPrim)
 		{
-			switch(CurPrimType)
+			if (vertex_eat)
 			{
-				case HGEPRIM_QUADS:
-					pD3DDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, nPrim<<2, 0, nPrim<<1);
-					break;
+				bool blend = (CurBlendMode & BLEND_ALPHABLEND) != 0;
+				bool color = (CurBlendMode & BLEND_COLORADD) != 0;
 
-				case HGEPRIM_TRIPLES:
-					pD3DDevice->DrawPrimitive(D3DPT_TRIANGLELIST, 0, nPrim);
-					break;
-
-				case HGEPRIM_LINES:
-					pD3DDevice->DrawPrimitive(D3DPT_LINELIST, 0, nPrim);
-					break;
+				auto pipeline = _RequestPipeline(CurPrimType, blend, color);
+				if (pipeline != CurDefaultShaderPipeline)
+				{
+					cgpu_render_encoder_bind_pipeline(cur_rp_encoder, pipeline);
+					CurDefaultShaderPipeline = pipeline;
+				}
+				auto descriptor_set = _RequestDescriptorSet(CurTexture, bTextureFilter, color);
+				if (descriptor_set != CurDefaultDescriptorSet)
+				{
+					cgpu_render_encoder_bind_descriptor_set(cur_rp_encoder, descriptor_set);
+					CurDefaultDescriptorSet = descriptor_set;
+				}
+				cgpu_render_encoder_bind_descriptor_set(cur_rp_encoder, per_frame_ubo_descriptor_sets[color]);
+				cgpu_render_encoder_bind_vertex_buffers(cur_rp_encoder, 1, &cur_vertex_buffer->pVB, &vert_stride, CGPU_NULLPTR);
+				cgpu_render_encoder_bind_index_buffer(cur_rp_encoder, cur_vertex_buffer->pIB, sizeof(WORD), 0);
+				if (CurPrimType == HGEPRIM_QUADS)
+					cgpu_render_encoder_draw_indexed(cur_rp_encoder, index_eat, cur_vertex_buffer->ib_eaten - index_eat, 0);
+				else
+					cgpu_render_encoder_draw(cur_rp_encoder, vertex_eat, cur_vertex_buffer->vb_eaten - vertex_eat);
 			}
 
-			nPrim=0;
+			nPrim = 0;
 		}
 
-		if(bEndScene) VertArray = 0;
-		pVB->Lock( 0, 0, (void**)&VertArray, 0 );
+		if (bEndScene) VertArray = 0;
+		else VertArray += vertex_eat;
 	}
 }
 
 void HGE_Impl::_SetBlendMode(int blend)
 {
-	if((blend & BLEND_ALPHABLEND) != (CurBlendMode & BLEND_ALPHABLEND))
-	{
-		if(blend & BLEND_ALPHABLEND) pD3DDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
-		else pD3DDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
-	}
-
-    if((blend & BLEND_ZWRITE) != (CurBlendMode & BLEND_ZWRITE))
-	{
-		if(blend & BLEND_ZWRITE) pD3DDevice->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
-		else pD3DDevice->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
-	}			
-	
-	if((blend & BLEND_COLORADD) != (CurBlendMode & BLEND_COLORADD))
-	{
-		if(blend & BLEND_COLORADD) pD3DDevice->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_ADD);
-		else pD3DDevice->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
-	}
-
 	CurBlendMode = blend;
 }
 
 void HGE_Impl::_SetProjectionMatrix(int width, int height)
 {
-	D3DXMATRIX tmp;
-	D3DXMatrixScaling(&matProj, 1.0f, -1.0f, 1.0f);
-	D3DXMatrixTranslation(&tmp, -0.5f, height+0.5f, 0.0f);
-	D3DXMatrixMultiply(&matProj, &matProj, &tmp);
-	D3DXMatrixOrthoOffCenterLH(&tmp, 0, (float)width, 0, (float)height, 0.0f, 1.0f);
-	D3DXMatrixMultiply(&matProj, &matProj, &tmp);
+	matProj = glm::orthoLH(0.0f, (float)width, (float)height, 0.0f, 0.0f, 1.0f);
+	//matProj[1][1] *= -1;
+}
+
+CShader loadShader(CGPUDeviceId device, std::span<uint8_t> vs, std::span<uint8_t> ps)
+{
+	CGPUShaderLibraryDescriptor vs_desc = {
+		.name = u8"VertexShaderLibrary",
+		.code = reinterpret_cast<const uint32_t*>(vs.data()),
+		.code_size = (uint32_t)vs.size(),
+		.stage = CGPU_SHADER_STAGE_VERT,
+	};
+	CGPUShaderLibraryDescriptor ps_desc = {
+		.name = u8"FragmentShaderLibrary",
+		.code = reinterpret_cast<const uint32_t*>(ps.data()),
+		.code_size = (uint32_t)ps.size(),
+		.stage = CGPU_SHADER_STAGE_FRAG,
+	};
+
+	CGPUShaderLibraryId vertex_shader = cgpu_create_shader_library(device, &vs_desc);
+	CGPUShaderLibraryId fragment_shader = cgpu_create_shader_library(device, &ps_desc);
+
+	CShader shader;
+	shader.entry[0].stage = CGPU_SHADER_STAGE_VERT;
+	shader.entry[0].entry = u8"main";
+	shader.entry[0].library = vertex_shader;
+	shader.entry[1].stage = CGPU_SHADER_STAGE_FRAG;
+	shader.entry[1].entry = u8"main";
+	shader.entry[1].library = fragment_shader;
+	CGPURootSignatureDescriptor rs_desc = {
+		.shaders = shader.entry,
+		.shader_count = 2
+	};
+	shader.root_sigs = cgpu_create_root_signature(device, &rs_desc);
+
+	return shader;
+}
+
+void freeShader(CShader shader)
+{
+	cgpu_free_root_signature(shader.root_sigs);
+	cgpu_free_shader_library(shader.entry[0].library);
+	cgpu_free_shader_library(shader.entry[1].library);
 }
 
 bool HGE_Impl::_GfxInit()
 {
-	static const char *szFormats[]={"UNKNOWN", "R5G6B5", "X1R5G5B5", "A1R5G5B5", "X8R8G8B8", "A8R8G8B8"};
-	D3DADAPTER_IDENTIFIER9 AdID;
-	D3DDISPLAYMODE Mode;
-	D3DFORMAT Format=D3DFMT_UNKNOWN;
-	UINT nModes, i;
-	
-// Init D3D
-							
-	pD3D=Direct3DCreate9(D3D_SDK_VERSION); // 120
-	if(pD3D==NULL)
+	FreeImage_Initialise(true);
+
+	CGPUInstanceDescriptor instance_desc = {
+		.backend = CGPU_BACKEND_VULKAN,
+		.enable_debug_layer = true,
+		.enable_gpu_based_validation = true,
+		.enable_set_name = true,
+		.logger = {
+			.log_callback = hge_graphicslog
+		},
+		.allocator = {
+			.malloc_fn = hge_graphicsmalloc,
+			.realloc_fn = hge_graphicsrealloc,
+			.calloc_fn = hge_graphicscalloc,
+			.free_fn = hge_graphicsfree,
+			.malloc_aligned_fn = hge_graphicsmalloc_aligned,
+			.realloc_aligned_fn = hge_graphicsrealloc_aligned,
+			.calloc_aligned_fn = hge_graphicscalloc_aligned,
+			.free_aligned_fn = hge_graphicsfree_aligned,
+		},
+	};
+	instance = cgpu_create_instance(&instance_desc);
+
+	uint32_t adapters_count = 0;
+	cgpu_enum_adapters(instance, CGPU_NULLPTR, &adapters_count);
+	CGPUAdapterId* adapters = (CGPUAdapterId*)_alloca(sizeof(CGPUAdapterId) * (adapters_count));
+	cgpu_enum_adapters(instance, adapters, &adapters_count);
+	auto adapter = adapters[0];
+
+	CGPUQueueGroupDescriptor G = {
+		.queue_type = CGPU_QUEUE_TYPE_GRAPHICS,
+		.queue_count = 1
+	};
+	CGPUDeviceDescriptor device_desc = {
+		.queue_groups = &G,
+		.queue_group_count = 1
+	};
+	device = cgpu_create_device(adapter, &device_desc);
+	gfx_queue = cgpu_get_queue(device, CGPU_QUEUE_TYPE_GRAPHICS, 0);
+	present_queue = gfx_queue;
+
+	surface = cgpu_surface_from_native_view(device, hwnd);
+
+	ECGPUFormat swapchainFormat = CGPU_FORMAT_R8G8B8A8_UNORM;
+	uint32_t swapchainCount = 1;
+	CGPUSwapChainDescriptor descriptor = {
+		.present_queues = &present_queue,
+		.present_queues_count = 1,
+		.surface = surface,
+		.image_count = swapchainCount,
+		.width = (uint32_t)nScreenWidth,
+		.height = (uint32_t)nScreenHeight,
+		.enable_vsync = true,
+ 		.format = swapchainFormat,
+ 	};
+	swapchain = cgpu_create_swapchain(device, &descriptor);
+
+	CGPUColorAttachment color_attachments = {
+		.format = swapchainFormat,
+		.load_action = CGPU_LOAD_ACTION_CLEAR,
+		.store_action = CGPU_STORE_ACTION_STORE,
+	};
+
+ 	CGPURenderPassDescriptor render_pass_descriptor = {
+		.name = u8"Adore_Render_Pass",
+		.sample_count = CGPU_SAMPLE_COUNT_1,
+		.color_attachments = &color_attachments,
+		.depth_stencil = nullptr,
+		.render_target_count = 1,
+	};
+	render_pass = cgpu_create_render_pass(device, &render_pass_descriptor);
+
+	swapchain_infos.clear();
+	for (size_t i = 0; i < swapchain->buffer_count; ++i)
 	{
-		_PostError("Can't create D3D interface");
-		return false;
+		PerSwapChainInfo info;
+
+		CGPUTextureViewDescriptor view_desc = {
+			.texture = swapchain->back_buffers[i],
+			.format = swapchain->back_buffers[i]->info->format,
+			.usages = CGPU_TVU_RTV_DSV,
+			.aspects = CGPU_TVA_COLOR,
+			.dims = CGPU_TEX_DIMENSION_2D,
+			.array_layer_count = 1,
+		};
+		info.texture = swapchain->back_buffers[i];
+		info.texture_view = cgpu_create_texture_view(device, &view_desc);
+
+		CGPUFramebufferDescriptor framebuffer_desc = {
+			.renderpass = render_pass,
+			.attachment_count = 1,
+			.attachments = &info.texture_view,
+			.width = (uint32_t)info.texture->info->width,
+			.height = (uint32_t)info.texture->info->height,
+			.layers = 1,
+		};
+		info.framebuffer = cgpu_create_framebuffer(device, &framebuffer_desc);
+
+		swapchain_infos.push_back(info);
 	}
 
-// Get adapter info
-
-	pD3D->GetAdapterIdentifier(D3DADAPTER_DEFAULT, D3DENUM_WHQL_LEVEL, &AdID);
-	System_Log("D3D Driver: %s",AdID.Driver);
-	System_Log("Description: %s",AdID.Description);
-	System_Log("Version: %d.%d.%d.%d",
-			HIWORD(AdID.DriverVersion.HighPart),
-			LOWORD(AdID.DriverVersion.HighPart),
-			HIWORD(AdID.DriverVersion.LowPart),
-			LOWORD(AdID.DriverVersion.LowPart));
-
-// Set up Windowed presentation parameters
-	
-	if(FAILED(pD3D->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &Mode)) || Mode.Format==D3DFMT_UNKNOWN) 
+	frame_datas.clear();
+	for (size_t i = 0; i < swapchain->buffer_count; ++i)
 	{
-		_PostError("Can't determine desktop video mode");
-		if(bWindowed) return false;
-	}
-	
-	ZeroMemory(&d3dppW, sizeof(d3dppW));
-
-	d3dppW.BackBufferWidth  = nScreenWidth;
-	d3dppW.BackBufferHeight = nScreenHeight;
-	d3dppW.BackBufferFormat = Mode.Format;
-	d3dppW.BackBufferCount  = 1;
-	d3dppW.MultiSampleType  = D3DMULTISAMPLE_NONE;
-	d3dppW.hDeviceWindow    = hwnd;
-	d3dppW.Windowed         = TRUE;
-
-	if(nHGEFPS==HGEFPS_VSYNC) d3dppW.SwapEffect = D3DSWAPEFFECT_COPY;
-	else					  d3dppW.SwapEffect = D3DSWAPEFFECT_COPY;
-
-	if(bZBuffer)
-	{
-		d3dppW.EnableAutoDepthStencil = TRUE;
-		d3dppW.AutoDepthStencilFormat = D3DFMT_D16;
+		PerFrameData frame_data;
+		frame_data.inflight_fence = cgpu_create_fence(device);
+		frame_data.prepared_semaphore = cgpu_create_semaphore(device);
+		frame_data.pool = cgpu_create_command_pool(gfx_queue, CGPU_NULLPTR);
+		frame_datas.push_back(frame_data);
 	}
 
-// Set up Full Screen presentation parameters
+ 	render_finished_semaphore = cgpu_create_semaphore(device);
 
-	nModes=pD3D->GetAdapterModeCount(D3DADAPTER_DEFAULT, D3DFMT_X8R8G8B8);
+	current_swapchain_index = 0;
+	current_frame_index = 0;
 
-	for(i=0; i<nModes; i++)
-	{
-		pD3D->EnumAdapterModes(D3DADAPTER_DEFAULT, D3DFMT_X8R8G8B8, i, &Mode);
-		if(Mode.Width != (UINT)nScreenWidth || Mode.Height != (UINT)nScreenHeight) continue;
-		if(nScreenBPP==16 && (_format_id(Mode.Format) > _format_id(D3DFMT_A1R5G5B5))) continue;
-		if(_format_id(Mode.Format) > _format_id(Format)) Format=Mode.Format;
-	}
+	vertexBuffers = createVertexBuffer(device, VERTEX_BUFFER_SIZE);
+	cur_vertex_buffer = vertexBuffers;
+	VertArray = (hgeVertex*)cur_vertex_buffer->pVB->info->cpu_mapped_address;
 
-	if(Format == D3DFMT_UNKNOWN)
-	{
-		_PostError("Can't find appropriate full screen video mode");
-		if(!bWindowed) return false;
-	}
+	uint8_t hge_vert_spv[] = {
+#include "hge.vs.spv.h"
+	};
 
-	ZeroMemory(&d3dppFS, sizeof(d3dppFS));
+	uint8_t hge_color_mul_frag_spv[] = {
+#include "hge_color_mul.ps.spv.h"
+	};
 
-	d3dppFS.BackBufferWidth  = nScreenWidth;
-	d3dppFS.BackBufferHeight = nScreenHeight;
-	d3dppFS.BackBufferFormat = Format;
-	d3dppFS.BackBufferCount  = 1;
-	d3dppFS.MultiSampleType  = D3DMULTISAMPLE_NONE;
-	d3dppFS.hDeviceWindow    = hwnd;
-	d3dppFS.Windowed         = FALSE;
+	uint8_t hge_color_add_frag_spv[] = {
+#include "hge_color_add.ps.spv.h"
+	};
 
-	d3dppFS.SwapEffect       = D3DSWAPEFFECT_FLIP;
-	d3dppFS.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
+	default_shaders[0] = loadShader(device, hge_vert_spv, hge_color_mul_frag_spv);
+	default_shaders[1] = loadShader(device, hge_vert_spv, hge_color_add_frag_spv);
 
-	if(nHGEFPS==HGEFPS_VSYNC) d3dppFS.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
-	else					  d3dppFS.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
+	CGPUSamplerDescriptor linear_sampler_desc = {
+		.min_filter = CGPU_FILTER_TYPE_LINEAR,
+		.mag_filter = CGPU_FILTER_TYPE_LINEAR,
+		.mipmap_mode = CGPU_MIPMAP_MODE_NEAREST,
+		.address_u = CGPU_ADDRESS_MODE_REPEAT,
+		.address_v = CGPU_ADDRESS_MODE_REPEAT,
+		.address_w = CGPU_ADDRESS_MODE_REPEAT,
+		.mip_lod_bias = 0,
+		.max_anisotropy = 1,
+	};
+	linear_sampler = cgpu_create_sampler(device, &linear_sampler_desc);
 
-	if(bZBuffer)
-	{
-		d3dppFS.EnableAutoDepthStencil = TRUE;
-		d3dppFS.AutoDepthStencilFormat = D3DFMT_D16;
-	}
+	CGPUSamplerDescriptor point_sampler_desc = {
+		.min_filter = CGPU_FILTER_TYPE_NEAREST,
+		.mag_filter = CGPU_FILTER_TYPE_NEAREST,
+		.mipmap_mode = CGPU_MIPMAP_MODE_NEAREST,
+		.address_u = CGPU_ADDRESS_MODE_REPEAT,
+		.address_v = CGPU_ADDRESS_MODE_REPEAT,
+		.address_w = CGPU_ADDRESS_MODE_REPEAT,
+		.mip_lod_bias = 0,
+		.max_anisotropy = 1,
+	};
+	point_sampler = cgpu_create_sampler(device, &point_sampler_desc);
 
-	d3dpp = bWindowed ? &d3dppW : &d3dppFS;
+	CGPUBufferDescriptor per_frame_ubo_desc = {
+		.size = sizeof(PerFrameUBOData),
+		.name = u8"pVB",
+		.descriptors = CGPU_RESOURCE_TYPE_UNIFORM_BUFFER,
+		.memory_usage = CGPU_MEM_USAGE_GPU_ONLY,
+		.flags = CGPU_BCF_HOST_VISIBLE,
+		.start_state = CGPU_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+	};
+	per_frame_ubo = cgpu_create_buffer(device, &per_frame_ubo_desc);
 
-	if(_format_id(d3dpp->BackBufferFormat) < 4) nScreenBPP=16;
-	else nScreenBPP=32;
-	
-// Create D3D Device
+	CGPUDescriptorSetDescriptor per_frame_ubo_set_desc_0 = {
+		.root_signature = default_shaders[0].root_sigs,
+		.set_index = 1,
+	};
+	per_frame_ubo_descriptor_sets[0] = cgpu_create_descriptor_set(device, &per_frame_ubo_set_desc_0);
 
-	if( FAILED( pD3D->CreateDevice( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hwnd,
-                                  D3DCREATE_SOFTWARE_VERTEXPROCESSING,
-                                  d3dpp, &pD3DDevice ) ) )
-	{
-		_PostError("Can't create D3D device");
-		return false;
-	}
-
-	_AdjustWindow();
-
-	System_Log("Mode: %d x %d x %s\n",nScreenWidth,nScreenHeight,szFormats[_format_id(Format)]);
-
-// Create vertex batch buffer
-
-	VertArray=0;
-	textures=0;
-
-// Init all stuff that can be lost
+	CGPUDescriptorSetDescriptor per_frame_ubo_set_desc_1 = {
+		.root_signature = default_shaders[1].root_sigs,
+		.set_index = 1,
+	};
+	per_frame_ubo_descriptor_sets[1] = cgpu_create_descriptor_set(device, &per_frame_ubo_set_desc_1);
 
 	_SetProjectionMatrix(nScreenWidth, nScreenHeight);
-	D3DXMatrixIdentity(&matView);
-	
-	if(!_init_lost()) return false;
+	matView = glm::mat4(1);
 
-	Gfx_Clear(0);
+	CGPUBufferRange per_frame_ubo_range = { .offset = 0, .size = sizeof(PerFrameUBOData) };
+	cgpu_map_buffer(per_frame_ubo, &per_frame_ubo_range);
+	PerFrameUBOData ubo_data = {
+		.matProj = matProj,
+		.matView = matView,
+	};
+	*((PerFrameUBOData*)per_frame_ubo->info->cpu_mapped_address) = ubo_data;
+	cgpu_unmap_buffer(per_frame_ubo);
+
+	CGPUDescriptorData datas[1];
+	datas[0] = {
+		.binding = 0,
+		.binding_type = CGPU_RESOURCE_TYPE_BUFFER,
+		.buffers = &per_frame_ubo,
+		.count = 1,
+	};
+
+	cgpu_update_descriptor_set(per_frame_ubo_descriptor_sets[0], datas, 1);
+	cgpu_update_descriptor_set(per_frame_ubo_descriptor_sets[1], datas, 1);
+
+	tex_white = Texture_Create(1, 1);
+	auto pixels = Texture_Lock(tex_white);
+	*pixels = RGBA(0xff, 0xff, 0xff, 0xff);
+	Texture_Unlock(tex_white);
 
 	return true;
-}
-
-int HGE_Impl::_format_id(D3DFORMAT fmt)
-{
-	switch(fmt) {
-		case D3DFMT_R5G6B5:		return 1;
-		case D3DFMT_X1R5G5B5:	return 2;
-		case D3DFMT_A1R5G5B5:	return 3;
-		case D3DFMT_X8R8G8B8:	return 4;
-		case D3DFMT_A8R8G8B8:	return 5;
-		default:				return 0;
-	}
 }
 
 void HGE_Impl::_AdjustWindow()
@@ -776,206 +927,420 @@ void HGE_Impl::_Resize(int width, int height)
 {
 	if(hwndParent)
 	{
-		//if(procFocusLostFunc) procFocusLostFunc();
 
-		d3dppW.BackBufferWidth=width;
-		d3dppW.BackBufferHeight=height;
-		nScreenWidth=width;
-		nScreenHeight=height;
-
-		_SetProjectionMatrix(nScreenWidth, nScreenHeight);
-		_GfxRestore();
-
-		//if(procFocusGainFunc) procFocusGainFunc();
 	}
 }
 
 void HGE_Impl::_GfxDone()
 {
-	CRenderTargetList *target=pTargets, *next_target;
-	
-	while(textures)	Texture_Free(textures->tex);
+	while (textures)	
+		Texture_Free((HTEXTURE)textures);
+	tex_white = NULL;
 
-	if(pScreenSurf) { pScreenSurf->Release(); pScreenSurf=0; }
-	if(pScreenDepth) { pScreenDepth->Release(); pScreenDepth=0; }
+	cgpu_wait_queue_idle(gfx_queue);
+	cgpu_wait_queue_idle(present_queue);
 
-	while(target)
-	{
-		if(target->pTex) target->pTex->Release();
-		if(target->pDepth) target->pDepth->Release();
-		next_target=target->next;
-		delete target;
-		target=next_target;
-	}
-	pTargets=0;
+	cgpu_free_semaphore(render_finished_semaphore);
+	render_finished_semaphore = CGPU_NULLPTR;
 
-	if(pIB)
+	for (size_t i = 0; i < frame_datas.size(); ++i)
 	{
-		pD3DDevice->SetIndices(NULL);
-		pIB->Release();
-		pIB=0;
+		auto frame_data = frame_datas[i];
+		cgpu_free_fence(frame_data.inflight_fence);
+		cgpu_free_semaphore(frame_data.prepared_semaphore);
+
+		for (auto cmd : frame_data.cmds)
+			cgpu_free_command_buffer(cmd);
+		frame_data.cmds.clear();
+
+		for (auto cmd : frame_data.allocated_cmds)
+			cgpu_free_command_buffer(cmd);
+		frame_data.allocated_cmds.clear();
+
+		cgpu_free_command_pool(frame_data.pool);
+
+		for (auto descriptor_set : frame_data.allocated_descriptor_sets)
+			cgpu_free_descriptor_set(descriptor_set);
+		frame_data.allocated_descriptor_sets.clear();
 	}
-	if(pVB)
+	frame_datas.clear();
+
+	for (size_t i = 0; i < swapchain_infos.size(); ++i)
 	{
-		if(VertArray) {	pVB->Unlock(); VertArray=0;	}
-		pD3DDevice->SetStreamSource( 0, NULL, 0, sizeof(hgeVertex) );
-		pVB->Release();
-		pVB=0;
+		auto info = swapchain_infos[i];
+		cgpu_free_texture_view(info.texture_view);
+		cgpu_free_framebuffer(info.framebuffer);
 	}
-	if(pD3DDevice) { pD3DDevice->Release(); pD3DDevice=0; }
-	if(pD3D) { pD3D->Release(); pD3D=0; }
+	swapchain_infos.clear();
+
+	cgpu_free_sampler(linear_sampler);
+	linear_sampler = CGPU_NULLPTR;
+
+	cgpu_free_sampler(point_sampler);
+	point_sampler = CGPU_NULLPTR;
+
+	while (vertexBuffers)
+	{
+		if (vertexBuffers->pVB)
+		{
+			cgpu_unmap_buffer(vertexBuffers->pVB);
+			cgpu_free_buffer(vertexBuffers->pVB);
+		}
+
+		if (vertexBuffers->pIB)
+			cgpu_free_buffer(vertexBuffers->pIB);
+		
+		auto prev = vertexBuffers;
+		vertexBuffers = vertexBuffers->next;
+		delete prev;
+	}
+
+
+	for (auto [_, pipeline] : default_shader_pipelines)
+	{
+		cgpu_free_render_pipeline(pipeline);
+	}
+	default_shader_pipelines.clear();
+
+	for (auto [_, descriptor_set] : default_shader_descriptor_sets)
+	{
+		cgpu_free_descriptor_set(descriptor_set);
+	}
+
+	freeShader(default_shaders[0]);
+	freeShader(default_shaders[1]);
+	memset(default_shaders, 0, sizeof(default_shaders));
+
+	for (auto [texture, texture_view] : deleted_textures)
+	{
+		cgpu_free_texture_view(texture_view);
+		cgpu_free_texture(texture);
+	}
+	deleted_textures.clear();
+
+	cgpu_free_buffer(per_frame_ubo);
+	per_frame_ubo = CGPU_NULLPTR;
+
+	cgpu_free_descriptor_set(per_frame_ubo_descriptor_sets[0]);
+	cgpu_free_descriptor_set(per_frame_ubo_descriptor_sets[1]);
+	memset(per_frame_ubo_descriptor_sets, 0, sizeof(per_frame_ubo_descriptor_sets));
+
+	// for (auto shader : deleted_shaders)
+	// 	deleteShaderImpl(shader);
+	// deleted_shaders.clear();
+
+	// for (auto image : deleted_images)
+	// 	deleteImageImpl(image);
+	// deleted_images.clear();
+
+	cgpu_free_render_pass(render_pass);
+	render_pass = CGPU_NULLPTR;
+
+	cgpu_free_swapchain(swapchain);
+	swapchain = CGPU_NULLPTR;
+	cgpu_free_surface(device, surface);
+	surface = CGPU_NULLPTR;
+
+	cgpu_free_queue(gfx_queue);
+	gfx_queue = CGPU_NULLPTR;
+	present_queue = CGPU_NULLPTR;
+	cgpu_free_device(device);
+	device = CGPU_NULLPTR;
+	cgpu_free_instance(instance);
+	instance = CGPU_NULLPTR;
+
+	FreeImage_DeInitialise();
 }
 
+bool HGE_Impl::_GfxStart()
+{
+	auto& cur_frame_data = frame_datas[current_frame_index];
+	cgpu_wait_fences(&cur_frame_data.inflight_fence, 1);
+
+	for (auto [texture, texture_view] : deleted_textures)
+	{
+		_DeleteDescriptorSet((HTEXTURE)texture_view);
+		cgpu_free_texture_view(texture_view);
+		cgpu_free_texture(texture);
+	}
+	deleted_textures.clear();
+
+	prepared = false;
+	nPrim = 0;
+	CurPrimType = 0;
+	CurDefaultShaderPipeline = CGPU_NULLPTR;
+	CurDefaultDescriptorSet = CGPU_NULLPTR;
+	CurBlendMode = 0;
+	cur_vertex_buffer = vertexBuffers;
+	VertArray = (hgeVertex*)cur_vertex_buffer->pVB->info->cpu_mapped_address;
+	cur_vertex_buffer->ib_eaten = 0;
+	cur_vertex_buffer->vb_eaten = 0;
+
+	cgpu_reset_command_pool(cur_frame_data.pool);
+
+	for (auto cmd : cur_frame_data.allocated_cmds)
+		cur_frame_data.cmds.push_back(cmd);
+	cur_frame_data.allocated_cmds.clear();
+
+	CGPUAcquireNextDescriptor acquire_desc = {
+		.signal_semaphore = cur_frame_data.prepared_semaphore,
+	};
+
+	current_swapchain_index = cgpu_acquire_next_image(swapchain, &acquire_desc);
+	if (current_swapchain_index == -1)
+		return false;
+
+	rendering = true;
+
+	return true;
+}
+
+void HGE_Impl::_GfxEnd()
+{
+	rendering = false;
+
+	auto& cur_frame_data = frame_datas[current_frame_index];
+	auto prepared_semaphore = cur_frame_data.prepared_semaphore;
+	CGPUQueueSubmitDescriptor submit_desc = {
+		.cmds = cur_frame_data.allocated_cmds.data(),
+		.signal_fence = cur_frame_data.inflight_fence,
+		.wait_semaphores = &prepared_semaphore,
+		.signal_semaphores = &render_finished_semaphore,
+		.cmds_count = (uint32_t)cur_frame_data.allocated_cmds.size(),
+		.wait_semaphore_count = 1,
+		.signal_semaphore_count = 1,
+	};
+	cgpu_submit_queue(gfx_queue, &submit_desc);
+
+	CGPUQueuePresentDescriptor present_desc = {
+		.swapchain = swapchain,
+		.wait_semaphores = &render_finished_semaphore,
+		.wait_semaphore_count = 1,
+		.index = (uint8_t)current_swapchain_index,
+	};
+	cgpu_queue_present(present_queue, &present_desc);
+
+	current_frame_index = (current_frame_index + 1) % swapchain->buffer_count;
+}
 
 bool HGE_Impl::_GfxRestore()
 {
-	CRenderTargetList *target=pTargets;
-
-	//if(!pD3DDevice) return false;
-	//if(pD3DDevice->TestCooperativeLevel() == D3DERR_DEVICELOST) return;
-
-	if(pScreenSurf) pScreenSurf->Release();
-	if(pScreenDepth) pScreenDepth->Release();
-
-	while(target)
-	{
-		if(target->pTex) target->pTex->Release();
-		if(target->pDepth) target->pDepth->Release();
-		target=target->next;
-	}
-
-	if(pIB)
-	{
-		pD3DDevice->SetIndices(NULL);
-		pIB->Release();
-	}
-	if(pVB)
-	{
-		pD3DDevice->SetStreamSource( 0, NULL, 0, sizeof(hgeVertex) );
-		pVB->Release();
-	}
-
-	pD3DDevice->Reset(d3dpp);
-
-	if(!_init_lost()) return false;
-
-	if(procGfxRestoreFunc) return procGfxRestoreFunc();
-
 	return true;
 }
 
 
 bool HGE_Impl::_init_lost()
 {
-	CRenderTargetList *target=pTargets;
+	return true;
+}
 
-// Store render target
-
-	pScreenSurf=0;
-	pScreenDepth=0;
-
-	pD3DDevice->GetRenderTarget( 0, &pScreenSurf);
-	pD3DDevice->GetDepthStencilSurface(&pScreenDepth);
-	
-	while(target)
+CGPUCommandBufferId HGE_Impl::_RequestCmd(PerFrameData &frame_data)
+{
+	CGPUCommandBufferId cmd;
+	if (!frame_data.cmds.empty())
 	{
-		if(target->pTex)
-			D3DXCreateTexture(pD3DDevice, target->width, target->height, 1, D3DUSAGE_RENDERTARGET,
-							  d3dpp->BackBufferFormat, D3DPOOL_DEFAULT, &target->pTex);
-		if(target->pDepth)
-			pD3DDevice->CreateDepthStencilSurface(target->width, target->height,
-													D3DFMT_D16, D3DMULTISAMPLE_NONE, 0, FALSE, &target->pDepth, NULL );
-
-		target=target->next;
-	}
-
-// Create Vertex buffer
-	
-	if( FAILED (pD3DDevice->CreateVertexBuffer(VERTEX_BUFFER_SIZE*sizeof(hgeVertex),
-                                              D3DUSAGE_WRITEONLY,
-											  D3DFVF_HGEVERTEX,
-											  D3DPOOL_DEFAULT, &pVB, NULL )))
-	{
-		_PostError("Can't create D3D vertex buffer");
-		return false;
-	}
-
-	pD3DDevice->SetVertexShader( NULL );pD3DDevice->SetFVF(D3DFVF_HGEVERTEX);
-	pD3DDevice->SetStreamSource( 0, pVB, 0, sizeof(hgeVertex) );
-
-// Create and setup Index buffer
-
-	if( FAILED( pD3DDevice->CreateIndexBuffer(VERTEX_BUFFER_SIZE*6/4*sizeof(WORD),
-                                              D3DUSAGE_WRITEONLY,
-											  D3DFMT_INDEX16,
-											  D3DPOOL_DEFAULT, &pIB, NULL ) ) )
-	{
-		_PostError("Can't create D3D index buffer");
-		return false;
-	}
-
-	WORD *pIndices, n=0;
-	if( FAILED( pIB->Lock( 0, 0, (void**)&pIndices, 0 ) ) )
-	{
-		_PostError("Can't lock D3D index buffer");
-		return false;
-	}
-
-	for(int i=0; i<VERTEX_BUFFER_SIZE/4; i++) {
-		*pIndices++=n;
-		*pIndices++=n+1;
-		*pIndices++=n+2;
-		*pIndices++=n+2;
-		*pIndices++=n+3;
-		*pIndices++=n;
-		n+=4;
-	}
-
-	pIB->Unlock();
-	pD3DDevice->SetIndices(pIB);
-
-// Set common render states
-
-	//pD3DDevice->SetRenderState( D3DRS_LASTPIXEL, FALSE );
-	pD3DDevice->SetRenderState( D3DRS_CULLMODE, D3DCULL_NONE );
-	pD3DDevice->SetRenderState( D3DRS_LIGHTING, FALSE );
-	
-	pD3DDevice->SetRenderState( D3DRS_ALPHABLENDENABLE,   TRUE );
-	pD3DDevice->SetRenderState( D3DRS_SRCBLEND,  D3DBLEND_SRCALPHA );
-	pD3DDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA );
-
-	pD3DDevice->SetRenderState( D3DRS_ALPHATESTENABLE, TRUE );
-	pD3DDevice->SetRenderState( D3DRS_ALPHAREF,        0x01 );
-	pD3DDevice->SetRenderState( D3DRS_ALPHAFUNC, D3DCMP_GREATEREQUAL );
-
-	pD3DDevice->SetTextureStageState( 0, D3DTSS_COLOROP,   D3DTOP_MODULATE );
-	pD3DDevice->SetTextureStageState( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE );
-	pD3DDevice->SetTextureStageState( 0, D3DTSS_COLORARG2, D3DTA_DIFFUSE );
-
-	pD3DDevice->SetTextureStageState( 0, D3DTSS_ALPHAOP,   D3DTOP_MODULATE );
-	pD3DDevice->SetTextureStageState( 0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE );
-	pD3DDevice->SetTextureStageState( 0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE );
-
-	pD3DDevice->SetSamplerState(0,D3DSAMP_MIPFILTER,D3DTEXF_POINT);
-
-	if(bTextureFilter)
-	{
-		pD3DDevice->SetSamplerState(0,D3DSAMP_MAGFILTER,D3DTEXF_LINEAR);
-		pD3DDevice->SetSamplerState(0,D3DSAMP_MINFILTER,D3DTEXF_LINEAR);
+		cmd = frame_data.cmds.back();
+		frame_data.cmds.pop_back();
 	}
 	else
 	{
-		pD3DDevice->SetSamplerState(0,D3DSAMP_MAGFILTER,D3DTEXF_POINT);
-		pD3DDevice->SetSamplerState(0,D3DSAMP_MINFILTER,D3DTEXF_POINT);
+		CGPUCommandBufferDescriptor cmd_desc = {.is_secondary = false};
+		cmd = cgpu_create_command_buffer(frame_data.pool, &cmd_desc);
 	}
 
-	nPrim=0;
-	CurPrimType=HGEPRIM_QUADS;
-	CurBlendMode = BLEND_DEFAULT;
-	CurTexture = NULL;
+	frame_data.allocated_cmds.push_back(cmd);
+	return cmd;
+}
 
-	pD3DDevice->SetTransform(D3DTS_VIEW, &matView);
-	pD3DDevice->SetTransform(D3DTS_PROJECTION, &matProj);
+CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType, bool blend, bool color)
+{
+	union
+	{
+		uint32_t value;
+		struct {
+			uint32_t primType : 2;
+			uint32_t blend : 1;
+			uint32_t color : 1;
+			uint32_t pad : 28;
+		} sep;
+	} key;
 
-	return true;
+	key.sep.primType = primType - 1;
+	key.sep.blend = blend;
+	key.sep.color = color;
+	key.sep.pad = 0;
+
+	auto iter = default_shader_pipelines.find(key.value);
+	if (iter != default_shader_pipelines.end())
+	{
+		return iter->second;
+	}
+	else
+	{
+		ECGPUFormat swapchainFormat = CGPU_FORMAT_R8G8B8A8_UNORM;
+		ECGPUFormat formats[1] = { swapchainFormat };
+		CGPUVertexLayout vertex_layout = {
+			.attribute_count = 3,
+			.attributes = {
+				{ u8"POSITION", 1, CGPU_FORMAT_R32G32B32_SFLOAT, 0, 0, sizeof(float) * 3, CGPU_INPUT_RATE_VERTEX },
+				{ u8"COLOR", 1, CGPU_FORMAT_R8G8B8A8_UNORM, 0, sizeof(float) * 3, sizeof(uint32_t), CGPU_INPUT_RATE_VERTEX },
+				{ u8"TEXCOORD0", 1, CGPU_FORMAT_R32G32_SFLOAT, 0, sizeof(float) * 3 + sizeof(uint32_t), sizeof(float) * 2, CGPU_INPUT_RATE_VERTEX },
+			}
+		};
+		CGPUBlendStateDescriptor blend_blend_state = {
+			.src_factors = { CGPU_BLEND_CONST_SRC_ALPHA },
+			.dst_factors = { CGPU_BLEND_CONST_ONE_MINUS_SRC_ALPHA },
+			.src_alpha_factors = { CGPU_BLEND_CONST_ONE },
+			.dst_alpha_factors = { CGPU_BLEND_CONST_ZERO },
+			.blend_modes = { CGPU_BLEND_MODE_ADD },
+			.blend_alpha_modes = { CGPU_BLEND_MODE_ADD },
+			.masks = { CGPU_COLOR_MASK_ALL },
+			.alpha_to_coverage = false,
+			.independent_blend = false,
+		};
+		CGPUBlendStateDescriptor blend_add_state = {
+			.src_factors = { CGPU_BLEND_CONST_SRC_ALPHA },
+			.dst_factors = { CGPU_BLEND_CONST_ONE },
+			.src_alpha_factors = { CGPU_BLEND_CONST_ONE },
+			.dst_alpha_factors = { CGPU_BLEND_CONST_ZERO },
+			.blend_modes = { CGPU_BLEND_MODE_ADD },
+			.blend_alpha_modes = { CGPU_BLEND_MODE_ADD },
+			.masks = { CGPU_COLOR_MASK_ALL },
+			.alpha_to_coverage = false,
+			.independent_blend = false,
+		};
+		CGPUDepthStateDesc depth_state = {
+			.depth_test = false,
+			.depth_write = false,
+			.stencil_test = false,
+		};
+		CGPURasterizerStateDescriptor rasterizer_state = {
+			.cull_mode = CGPU_CULL_MODE_NONE,
+		};
+		ECGPUPrimitiveTopology prim_topology = CGPU_PRIM_TOPO_TRI_LIST;
+		if (primType == HGEPRIM_QUADS)
+			prim_topology = CGPU_PRIM_TOPO_TRI_LIST;
+		else if (primType == HGEPRIM_TRIPLES)
+			prim_topology = CGPU_PRIM_TOPO_TRI_LIST;
+		else if (primType == HGEPRIM_LINES)
+			prim_topology = CGPU_PRIM_TOPO_LINE_LIST;
+		CGPURenderPipelineDescriptor rp_desc = {
+			.root_signature = default_shaders[color].root_sigs,
+			.vertex_shader = &default_shaders[color].entry[0],
+			.fragment_shader = &default_shaders[color].entry[1],
+			.vertex_layout = &vertex_layout,
+			.blend_state = blend ? &blend_blend_state : &blend_add_state,
+			.depth_state = &depth_state,
+			.rasterizer_state = &rasterizer_state,
+			.render_pass = render_pass,
+			.subpass = 0,
+			.render_target_count = 1,
+			.prim_topology = prim_topology,
+		};
+		auto pipeline = cgpu_create_render_pipeline(device, &rp_desc);
+		default_shader_pipelines.insert({ key.value, pipeline });
+
+		return pipeline;
+	}
+}
+
+CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear, bool color)
+{
+	if (tex == NULL) {
+		tex = tex_white; color = false;
+	}
+	auto texItem = (CTextureList*)tex;
+	if (!texItem)
+		return CGPU_NULLPTR;
+	DescriptorSetKey key = { .tex = texItem, .sampler = linear, .color = color };
+	auto iter = default_shader_descriptor_sets.find(key);
+	if (iter != default_shader_descriptor_sets.end())
+	{
+		return iter->second;
+	}
+	else
+	{
+		CGPUDescriptorSetDescriptor set_desc = {
+			.root_signature = default_shaders[color].root_sigs,
+			.set_index = 0,
+		};
+		auto descriptor_set = cgpu_create_descriptor_set(device, &set_desc);
+
+		CGPUTextureViewId texture_view = texItem->tex_view;
+		CGPUSamplerId sampler = linear ? linear_sampler : point_sampler;
+
+		CGPUDescriptorData datas[2];
+		datas[0] = {
+			.binding = 0,
+			.binding_type = CGPU_RESOURCE_TYPE_TEXTURE,
+			.textures = &texture_view,
+			.count = 1,
+		};
+		datas[1] = {
+			.binding = 1,
+			.binding_type = CGPU_RESOURCE_TYPE_SAMPLER,
+			.samplers = &sampler,
+			.count = 1,
+		};
+
+		cgpu_update_descriptor_set(descriptor_set, datas, 2);
+		default_shader_descriptor_sets.insert({ key, descriptor_set });
+
+		return descriptor_set;
+	}
+}
+
+void HGE_Impl::_DeleteDescriptorSet(HTEXTURE tex)
+{
+	auto texItem = (CTextureList*)tex;
+	{
+		DescriptorSetKey key = { .tex = texItem, .sampler = true };
+		auto iter = default_shader_descriptor_sets.find(key);
+		if (iter != default_shader_descriptor_sets.end())
+		{
+			cgpu_free_descriptor_set(iter->second);
+			default_shader_descriptor_sets.erase(iter);
+		}
+	}
+
+	{
+		DescriptorSetKey key = { .tex = texItem, .sampler = false };
+		auto iter = default_shader_descriptor_sets.find(key);
+		if (iter != default_shader_descriptor_sets.end())
+		{
+			cgpu_free_descriptor_set(iter->second);
+			default_shader_descriptor_sets.erase(iter);
+		}
+	}
+}
+
+bool HGE_Impl::_OutOfVertexBugets(uint32_t request_vertex_count, uint32_t request_index_count)
+{
+	return (cur_vertex_buffer->vb_eaten + request_vertex_count) > VERTEX_BUFFER_SIZE || (cur_vertex_buffer->ib_eaten + request_index_count) > VERTEX_BUFFER_SIZE * 6 / 4;
+}
+
+void HGE_Impl::_UploadVertexData(const hgeVertex* v)
+{
+	int vertex_eat = CurPrimType, index_eat = CurPrimType == HGEPRIM_QUADS ? 6 : 0;
+	if (_OutOfVertexBugets(vertex_eat, index_eat))
+	{
+		_render_batch(false);
+		_ExpandVertexBuffer();
+	}
+
+	memcpy(&VertArray[nPrim * CurPrimType], v, sizeof(hgeVertex) * CurPrimType);
+	nPrim++;
+	cur_vertex_buffer->vb_eaten += vertex_eat;
+	cur_vertex_buffer->ib_eaten += index_eat;
+}
+
+void HGE_Impl::_ExpandVertexBuffer()
+{
+	if (!cur_vertex_buffer->next)
+		cur_vertex_buffer->next = createVertexBuffer(device, VERTEX_BUFFER_SIZE);
+
+	cur_vertex_buffer = cur_vertex_buffer->next;
+	VertArray = (hgeVertex*)cur_vertex_buffer->pVB->info->cpu_mapped_address;
+	cur_vertex_buffer->ib_eaten = 0;
+	cur_vertex_buffer->vb_eaten = 0;
 }

@@ -168,7 +168,7 @@ void DInit() {
 
 	for(int i=0; i<4; i++) {
 		dquad.v[i].z=0.5f;
-		dquad.v[i].col=0xFFFFFFFF;
+		dquad.v[i].col=ARGB(0xFF,0xFF,0xFF,0xFF);
 	}
 
 	dquad.v[0].tx=0.0f; dquad.v[0].ty=0.0f;
@@ -199,17 +199,21 @@ bool DFrame() {
 	else if(dtime<1.25) alpha=(BYTE)((1.0f-(dtime-1.0f)*4)*0xFF);
 	else return true;
 
-	col=0xFFFFFF | (alpha<<24);
+	col=ARGB(alpha,0xFF,0xFF,0xFF);
 	dquad.v[0].col=col;
 	dquad.v[1].col=col;
 	dquad.v[2].col=col;
 	dquad.v[3].col=col;
 
+
+	return false;
+}
+
+bool DRender() {
 	pHGE->Gfx_BeginScene();
 	pHGE->Gfx_Clear(0);
 	pHGE->Gfx_RenderQuad(&dquad);
 	pHGE->Gfx_EndScene();
-
 	return false;
 }
 

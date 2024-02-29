@@ -88,7 +88,7 @@ bool RenderFunc()
 	hge->Gfx_BeginScene();
 	hge->Gfx_RenderQuad(&quad);
 	gui->Render();
-	fnt->SetColor(0xFFFFFFFF);
+	fnt->SetColor(ARGB(0xFF,0xFF,0xFF,0xFF));
 	fnt->printf(5, 5, HGETEXT_LEFT, "dt:%.3f\nFPS:%d", hge->Timer_GetDelta(), hge->Timer_GetFPS());
 	hge->Gfx_EndScene();
 
@@ -133,8 +133,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		{
 			// Set up z-coordinate of vertices
 			quad.v[i].z=0.5f;
-			// Set up color. The format of DWORD col is 0xAARRGGBB
-			quad.v[i].col=0xFFFFFFFF;
+			// Set up color. The format of DWORD col is 0xAABBGGRR
+			quad.v[i].col=ARGB(0xFF,0xFF,0xFF,0xFF);
 		}
 
 		quad.v[0].x=0; quad.v[0].y=0; 

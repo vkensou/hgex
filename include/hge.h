@@ -76,15 +76,16 @@ typedef uintptr_t HCHANNEL;
 /*
 ** Hardware color macros
 */
-#define ARGB(a,r,g,b)	((DWORD(a)<<24) + (DWORD(r)<<16) + (DWORD(g)<<8) + DWORD(b))
+#define ARGB(a,r,g,b)	((DWORD(a)<<24) + (DWORD(r)<<0) + (DWORD(g)<<8) + (DWORD(b)<<16))
+#define RGBA(r,g,b,a)	((DWORD(r)<<0) + (DWORD(g)<<8) + (DWORD(b)<<16) + (DWORD(a)<<24))
 #define GETA(col)		((col)>>24)
-#define GETR(col)		(((col)>>16) & 0xFF)
+#define GETR(col)		(((col)>>0) & 0xFF)
 #define GETG(col)		(((col)>>8) & 0xFF)
-#define GETB(col)		((col) & 0xFF)
+#define GETB(col)		(((col)>>16) & 0xFF)
 #define SETA(col,a)		(((col) & 0x00FFFFFF) + (DWORD(a)<<24))
-#define SETR(col,r)		(((col) & 0xFF00FFFF) + (DWORD(r)<<16))
+#define SETR(col,r)		(((col) & 0xFFFFFF00) + (DWORD(r)<<0))
 #define SETG(col,g)		(((col) & 0xFFFF00FF) + (DWORD(g)<<8))
-#define SETB(col,b)		(((col) & 0xFFFFFF00) + DWORD(b))
+#define SETB(col,b)		(((col) & 0xFF00FFFF) + (DWORD(b)<<16))
 
 
 /*
@@ -116,6 +117,8 @@ enum hgeBoolState
 	HGE_HIDEMOUSE		= 6,	// bool		hide system cursor?	(default: true)
 
 	HGE_SHOWSPLASH		= 7,	// bool		hide system cursor?	(default: true)
+
+	HGE_CAPTURERENDER	= 8,	// bool		enable capture?		(default: false)
 
 	HGEBOOLSTATE_FORCE_DWORD = 0x7FFFFFFF
 };

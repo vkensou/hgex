@@ -12,8 +12,11 @@
 
 #include "..\..\include\hge.h"
 #include <stdio.h>
-#include <d3d9.h>
-#include <d3dx9.h>
+#include "cgpu/api.h"
+#include <vector>
+#include <unordered_map>
+#include "glm/mat4x4.hpp"
+#include "renderdoc.h"
 
 #define DEMO
 
@@ -28,16 +31,16 @@ struct CRenderTargetList
 {
 	int					width;
 	int					height;
-	IDirect3DTexture9*	pTex;
-	IDirect3DSurface9*	pDepth;
+	void*	pTex;
+	void*	pDepth;
 	CRenderTargetList*	next;
 };
 
 struct CTextureList
 {
-	HTEXTURE			tex;
-	int					width;
-	int					height;
+	CGPUTextureId		tex;
+	CGPUTextureViewId	tex_view;
+	uint8_t*			locked;
 	CTextureList*		next;
 };
 
@@ -55,16 +58,73 @@ struct CStreamList
 	CStreamList*		next;
 };
 
+struct CShader
+{
+	CGPUShaderEntryDescriptor entry[2];
+	CGPURootSignatureId root_sigs;
+};
+
 struct CInputEventList
 {
 	hgeInputEvent		event;
 	CInputEventList*	next;
 };
 
+struct CVertexBufferList
+{
+	CGPUBufferId pVB;
+	CGPUBufferId pIB;
+	uint32_t vb_eaten;
+	uint32_t ib_eaten;
+	CVertexBufferList* next;
+};
+
+struct PerSwapChainInfo
+{
+	CGPUTextureId texture;
+	CGPUTextureViewId texture_view;
+	CGPUFramebufferId framebuffer;
+};
+
+struct PerFrameData
+{
+	CGPUFenceId inflight_fence{ CGPU_NULLPTR };
+	CGPUSemaphoreId prepared_semaphore{ CGPU_NULLPTR };
+	CGPUCommandPoolId pool{ CGPU_NULLPTR };
+	std::vector<CGPUCommandBufferId> cmds;
+	std::vector<CGPUCommandBufferId> allocated_cmds;
+	std::vector<CGPUDescriptorSetId> allocated_descriptor_sets;
+	CGPUDescriptorSetId last_descriptor_set{ CGPU_NULLPTR };
+};
+
+struct PerFrameUBOData
+{
+	glm::mat4 matProj;
+	glm::mat4 matView;
+};
+
+struct DescriptorSetKey
+{
+	CTextureList* tex;
+	bool sampler;
+	bool color;
+
+	bool operator==(const DescriptorSetKey& other) const {
+		return tex == other.tex && sampler == other.sampler && color == other.color;
+	}
+};
+
+struct DescriptorSetKeyHash
+{
+	std::size_t operator()(const DescriptorSetKey& k) const {
+		return ((std::hash<void*>()(k.tex) ^ (std::hash<bool>()(k.sampler) << 1)) << 1) ^ (std::hash<bool>()(k.color) << 1);
+	}
+};
 
 void DInit();
 void DDone();
 bool DFrame();
+bool DRender();
 
 
 /*
@@ -231,6 +291,7 @@ public:
 	int					nHGEFPS;
 	bool				bHideMouse;
 	bool				bDontSuspend;
+	bool				bEnableCaptureRender;
 	HWND				hwndParent;
 
 	#ifdef DEMO
@@ -249,48 +310,76 @@ public:
 
 
 	// Graphics
-	D3DPRESENT_PARAMETERS*  d3dpp;
+	CGPUInstanceId instance;
+	CGPUDeviceId device;
+	CGPUQueueId gfx_queue;
+	CGPUQueueId present_queue;
+	CGPUSurfaceId surface;
+	CGPUSwapChainId swapchain;
+	RECT rectW;
+	LONG styleW;
+	RECT rectFS;
+	LONG styleFS;
+	std::vector<PerSwapChainInfo> swapchain_infos;
+	uint32_t current_swapchain_index;
+	CGPURenderPassId render_pass;
+	std::vector<PerFrameData> frame_datas;
+	uint32_t current_frame_index;
+	CGPUSemaphoreId render_finished_semaphore;
+	CGPUCommandBufferId cur_cmd;
+	CGPURenderPassEncoderId cur_rp_encoder;
+	bool rendering;
+	bool prepared;
+	CVertexBufferList* cur_vertex_buffer;
+	CShader default_shaders[2];
+	std::unordered_map<uint32_t, CGPURenderPipelineId> default_shader_pipelines;
+	std::unordered_map<DescriptorSetKey, CGPUDescriptorSetId, DescriptorSetKeyHash> default_shader_descriptor_sets;
+	CGPUSamplerId linear_sampler, point_sampler;
+	std::vector<std::tuple<CGPUTextureId, CGPUTextureViewId>> deleted_textures;
+	CGPUBufferId per_frame_ubo;
+	CGPUDescriptorSetId per_frame_ubo_descriptor_sets[2];
 
-	D3DPRESENT_PARAMETERS   d3dppW;
-	RECT					rectW;
-	LONG					styleW;
-
-	D3DPRESENT_PARAMETERS   d3dppFS;
-	RECT					rectFS;
-	LONG					styleFS;
-
-	IDirect3D9*				pD3D;
-	IDirect3DDevice9*		pD3DDevice;
-	IDirect3DVertexBuffer9*	pVB;
-	IDirect3DIndexBuffer9*	pIB;
-
-	IDirect3DSurface9*	pScreenSurf;
-	IDirect3DSurface9*	pScreenDepth;
-	CRenderTargetList*	pTargets;
-	CRenderTargetList*	pCurTarget;
-
-	D3DXMATRIX			matView;
-	D3DXMATRIX			matProj;
+	glm::mat4			matView;
+	glm::mat4			matProj;
 
 	CTextureList*		textures;
+	CVertexBufferList*	vertexBuffers;
 	hgeVertex*			VertArray;
+	HTEXTURE			tex_white;
 
 	int					nPrim;
 	int					CurPrimType;
 	int					CurBlendMode;
 	HTEXTURE			CurTexture;
+	CGPURenderPipelineId CurDefaultShaderPipeline;
+	CGPUDescriptorSetId CurDefaultDescriptorSet;
 
 	bool				_GfxInit();
 	void				_GfxDone();
+	bool				_GfxStart();
+	void				_GfxEnd();
 	bool				_GfxRestore();
 	void				_AdjustWindow();
 	void				_Resize(int width, int height);
 	bool				_init_lost();
 	void				_render_batch(bool bEndScene=false);
-	int					_format_id(D3DFORMAT fmt);
 	void				_SetBlendMode(int blend);
 	void				_SetProjectionMatrix(int width, int height);
-	
+	CGPUCommandBufferId	_RequestCmd(PerFrameData &frame_data);
+	CGPURenderPipelineId _RequestPipeline(int primType, bool blend, bool color);
+	CGPUDescriptorSetId _RequestDescriptorSet(HTEXTURE tex, bool sampler, bool color);
+	void				_DeleteDescriptorSet(HTEXTURE tex);
+	bool				_OutOfVertexBugets(uint32_t request_vertex_count, uint32_t request_index_count);
+	void				_UploadVertexData(const hgeVertex* v);
+	void				_ExpandVertexBuffer();
+
+	// Render Capture
+	RENDERDOC_API_1_0_0*	rdc = nullptr;
+	bool				rdc_capture = false;
+
+	void				_CaptureInit();
+	void				_CaptureStart();
+	void				_CaptureEnd();
 
 	// Audio
 	HINSTANCE			hBass;
