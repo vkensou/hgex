@@ -375,6 +375,7 @@ HTEXTURE CALL HGE_Impl::Texture_Create(int width, int height)
 {
 	CGPUTextureDescriptor texture_desc =
 	{
+		.flags = CGPU_TCF_FORCE_2D,
 		.width = (uint64_t)width,
 		.height = (uint64_t)height,
 		.depth = 1,
