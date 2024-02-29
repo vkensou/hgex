@@ -291,6 +291,7 @@ public:
 	int					nHGEFPS;
 	bool				bHideMouse;
 	bool				bDontSuspend;
+	bool				bEnableCaptureRender;
 	HWND				hwndParent;
 
 	#ifdef DEMO

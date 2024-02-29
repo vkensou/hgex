@@ -118,6 +118,8 @@ enum hgeBoolState
 
 	HGE_SHOWSPLASH		= 7,	// bool		hide system cursor?	(default: true)
 
+	HGE_CAPTURERENDER	= 8,	// bool		enable capture?		(default: false)
+
 	HGEBOOLSTATE_FORCE_DWORD = 0x7FFFFFFF
 };
 

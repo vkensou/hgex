@@ -393,6 +393,8 @@ void CALL HGE_Impl::System_SetStateBool(hgeBoolState state, bool value)
 		#ifdef DEMO
 		case HGE_SHOWSPLASH:	bDMO=value; break;
 		#endif
+
+		case HGE_CAPTURERENDER:	bEnableCaptureRender=value; break;
 	}
 }
 
@@ -682,6 +684,7 @@ HGE_Impl::HGE_Impl()
 	nFixedDelta=0;
 	bHideMouse=true;
 	bDontSuspend=false;
+	bEnableCaptureRender=false;
 	hwndParent=0;
 
 	nPowerStatus=HGEPWR_UNSUPPORTED;

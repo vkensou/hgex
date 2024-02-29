@@ -63,6 +63,8 @@ RENDERDOC_API_1_0_0* GetRenderDocApi()
 
 void HGE_Impl::_CaptureInit()
 {
+	if(!bEnableCaptureRender) return;
+
 	auto renderdoc_path = locate_renderdoc();
 	if (load_renderdoc(renderdoc_path))
 		rdc = GetRenderDocApi();
