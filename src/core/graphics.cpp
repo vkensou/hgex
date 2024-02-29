@@ -142,40 +142,8 @@ void CALL HGE_Impl::Gfx_SetTransform(float x, float y, float dx, float dy, float
 
 bool CALL HGE_Impl::Gfx_BeginScene(HTARGET targ)
 {
-	auto &cur_frame_data = frame_datas[current_frame_index];
-	cgpu_wait_fences(&cur_frame_data.inflight_fence, 1);
-
-	for (auto [texture, texture_view] : deleted_textures)
-	{
-		_DeleteDescriptorSet((HTEXTURE)texture_view);
-		cgpu_free_texture_view(texture_view);
-		cgpu_free_texture(texture);
-	}
-	deleted_textures.clear();
-
-	prepared = false;
-	nPrim = 0;
-	CurPrimType = 0;
-	CurDefaultShaderPipeline = CGPU_NULLPTR;
-	CurDefaultDescriptorSet = CGPU_NULLPTR;
-	CurBlendMode = 0;
-	cur_vertex_buffer = vertexBuffers;
-	VertArray = (hgeVertex*)cur_vertex_buffer->pVB->info->cpu_mapped_address;
-	cur_vertex_buffer->ib_eaten = 0;
-	cur_vertex_buffer->vb_eaten = 0;
-
-	cgpu_reset_command_pool(cur_frame_data.pool);
-
-	for (auto cmd : cur_frame_data.allocated_cmds)
-		cur_frame_data.cmds.push_back(cmd);
-	cur_frame_data.allocated_cmds.clear();
-
-	CGPUAcquireNextDescriptor acquire_desc = {
-		.signal_semaphore = cur_frame_data.prepared_semaphore,
-	};
-
-	current_swapchain_index = cgpu_acquire_next_image(swapchain, &acquire_desc);
-	auto &cur_swapchain_info = swapchain_infos[current_swapchain_index];
+	auto& cur_frame_data = frame_datas[current_frame_index];
+	auto& cur_swapchain_info = swapchain_infos[current_swapchain_index];
 
 	auto back_buffer = cur_swapchain_info.texture;
 	auto back_buffer_view = cur_swapchain_info.texture_view;
@@ -218,27 +186,6 @@ void CALL HGE_Impl::Gfx_EndScene()
 	cgpu_cmd_resource_barrier(cur_cmd, &barrier_desc1);
 
 	cgpu_cmd_end(cur_cmd);
-
-	CGPUQueueSubmitDescriptor submit_desc = {
-		.cmds = cur_frame_data.allocated_cmds.data(),
-		.signal_fence = cur_frame_data.inflight_fence,
-		.wait_semaphores = &prepared_semaphore,
-		.signal_semaphores = &render_finished_semaphore,
-		.cmds_count = (uint32_t)cur_frame_data.allocated_cmds.size(),
-		.wait_semaphore_count = 1,
-		.signal_semaphore_count = 1,
-	};
-	cgpu_submit_queue(gfx_queue, &submit_desc);
-
-	CGPUQueuePresentDescriptor present_desc = {
-		.swapchain = swapchain,
-		.wait_semaphores = &render_finished_semaphore,
-		.wait_semaphore_count = 1,
-		.index = (uint8_t)current_swapchain_index,
-	};
-	cgpu_queue_present(present_queue, &present_desc);
-
-	current_frame_index = (current_frame_index + 1) % swapchain->buffer_count;
 }
 
 void CALL HGE_Impl::Gfx_RenderLine(float x1, float y1, float x2, float y2, DWORD color, float z)
@@ -1103,6 +1050,77 @@ void HGE_Impl::_GfxDone()
 	instance = CGPU_NULLPTR;
 
 	FreeImage_DeInitialise();
+}
+
+bool HGE_Impl::_GfxStart()
+{
+	auto& cur_frame_data = frame_datas[current_frame_index];
+	cgpu_wait_fences(&cur_frame_data.inflight_fence, 1);
+
+	for (auto [texture, texture_view] : deleted_textures)
+	{
+		_DeleteDescriptorSet((HTEXTURE)texture_view);
+		cgpu_free_texture_view(texture_view);
+		cgpu_free_texture(texture);
+	}
+	deleted_textures.clear();
+
+	prepared = false;
+	nPrim = 0;
+	CurPrimType = 0;
+	CurDefaultShaderPipeline = CGPU_NULLPTR;
+	CurDefaultDescriptorSet = CGPU_NULLPTR;
+	CurBlendMode = 0;
+	cur_vertex_buffer = vertexBuffers;
+	VertArray = (hgeVertex*)cur_vertex_buffer->pVB->info->cpu_mapped_address;
+	cur_vertex_buffer->ib_eaten = 0;
+	cur_vertex_buffer->vb_eaten = 0;
+
+	cgpu_reset_command_pool(cur_frame_data.pool);
+
+	for (auto cmd : cur_frame_data.allocated_cmds)
+		cur_frame_data.cmds.push_back(cmd);
+	cur_frame_data.allocated_cmds.clear();
+
+	CGPUAcquireNextDescriptor acquire_desc = {
+		.signal_semaphore = cur_frame_data.prepared_semaphore,
+	};
+
+	current_swapchain_index = cgpu_acquire_next_image(swapchain, &acquire_desc);
+	if (current_swapchain_index == -1)
+		return false;
+
+	rendering = true;
+
+	return true;
+}
+
+void HGE_Impl::_GfxEnd()
+{
+	rendering = false;
+
+	auto& cur_frame_data = frame_datas[current_frame_index];
+	auto prepared_semaphore = cur_frame_data.prepared_semaphore;
+	CGPUQueueSubmitDescriptor submit_desc = {
+		.cmds = cur_frame_data.allocated_cmds.data(),
+		.signal_fence = cur_frame_data.inflight_fence,
+		.wait_semaphores = &prepared_semaphore,
+		.signal_semaphores = &render_finished_semaphore,
+		.cmds_count = (uint32_t)cur_frame_data.allocated_cmds.size(),
+		.wait_semaphore_count = 1,
+		.signal_semaphore_count = 1,
+	};
+	cgpu_submit_queue(gfx_queue, &submit_desc);
+
+	CGPUQueuePresentDescriptor present_desc = {
+		.swapchain = swapchain,
+		.wait_semaphores = &render_finished_semaphore,
+		.wait_semaphore_count = 1,
+		.index = (uint8_t)current_swapchain_index,
+	};
+	cgpu_queue_present(present_queue, &present_desc);
+
+	current_frame_index = (current_frame_index + 1) % swapchain->buffer_count;
 }
 
 bool HGE_Impl::_GfxRestore()

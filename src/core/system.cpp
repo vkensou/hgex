@@ -318,7 +318,11 @@ bool CALL HGE_Impl::System_Start()
 				if (Input_KeyUp(HGEK_P)) rdc_capture = true;
 				if (rdc && rdc_capture)
 					rdc->StartFrameCapture(nullptr, nullptr);
-				if(procRenderFunc) procRenderFunc();
+				if(_GfxStart())
+				{
+					if(procRenderFunc) procRenderFunc();
+					_GfxEnd();
+				}
 				if (rdc && rdc_capture)
 				{
 					rdc->EndFrameCapture(nullptr, nullptr);
@@ -741,7 +745,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 			return FALSE;
 		
 		case WM_PAINT:
-			if(pHGE->surface && pHGE->procRenderFunc && pHGE->bWindowed) pHGE->procRenderFunc();
+			if(pHGE->surface && pHGE->procRenderFunc && pHGE->bWindowed)
+			{
+				if(pHGE->_GfxStart())
+				{
+					pHGE->procRenderFunc();
+					pHGE->_GfxEnd();
+				}
+			}
 			break;
 
 		case WM_DESTROY:

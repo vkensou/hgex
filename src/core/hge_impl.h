@@ -326,6 +326,7 @@ public:
 	CGPUSemaphoreId render_finished_semaphore;
 	CGPUCommandBufferId cur_cmd;
 	CGPURenderPassEncoderId cur_rp_encoder;
+	bool rendering;
 	bool prepared;
 	CVertexBufferList* cur_vertex_buffer;
 	CShader default_shaders[2];
@@ -353,6 +354,8 @@ public:
 
 	bool				_GfxInit();
 	void				_GfxDone();
+	bool				_GfxStart();
+	void				_GfxEnd();
 	bool				_GfxRestore();
 	void				_AdjustWindow();
 	void				_Resize(int width, int height);
