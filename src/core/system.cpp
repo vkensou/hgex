@@ -9,7 +9,6 @@
 
 #include "hge_impl.h"
 #include <direct.h>
-#include "renderdoc_helper.h"
 
 
 #define LOWORDINT(n) ((int)((signed short)(LOWORD(n))))
@@ -64,8 +63,6 @@ void CALL HGE_Impl::Release()
 	}
 }
 
-RENDERDOC_API_1_0_0* rdc = nullptr;
-bool rdc_capture = false;
 
 bool CALL HGE_Impl::System_Initiate()
 {
@@ -156,14 +153,11 @@ bool CALL HGE_Impl::System_Initiate()
 
 	// Init subsystems
 
-	//auto renderdoc_path = locate_renderdoc();
-	//if (load_renderdoc(renderdoc_path))
-	//	rdc = GetRenderDocApi();
-
 	timeBeginPeriod(1);
 	Random_Seed();
 	_InitPowerStatus();
 	_InputInit();
+	_CaptureInit();
 	if(!_GfxInit()) { System_Shutdown(); return false; }
 	if(!_SoundInit()) { System_Shutdown(); return false; }
 
@@ -315,23 +309,13 @@ bool CALL HGE_Impl::System_Start()
 				// Do user's stuff
 
 				if(procFrameFunc()) break;
-				if (Input_KeyUp(HGEK_P)) rdc_capture = true;
-				if (rdc && rdc_capture)
-					rdc->StartFrameCapture(nullptr, nullptr);
+				_CaptureStart();
 				if(_GfxStart())
 				{
 					if(procRenderFunc) procRenderFunc();
 					_GfxEnd();
 				}
-				if (rdc && rdc_capture)
-				{
-					rdc->EndFrameCapture(nullptr, nullptr);
-					if (!rdc->IsRemoteAccessConnected())
-					{
-						rdc->LaunchReplayUI(1, "");
-					}
-				}
-				rdc_capture = false;
+				_CaptureEnd();
 
 				// If if "child mode" - return after processing single frame
 

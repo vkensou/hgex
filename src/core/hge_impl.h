@@ -16,6 +16,7 @@
 #include <vector>
 #include <unordered_map>
 #include "glm/mat4x4.hpp"
+#include "renderdoc.h"
 
 #define DEMO
 
@@ -370,6 +371,14 @@ public:
 	bool				_OutOfVertexBugets(uint32_t request_vertex_count, uint32_t request_index_count);
 	void				_UploadVertexData(const hgeVertex* v);
 	void				_ExpandVertexBuffer();
+
+	// Render Capture
+	RENDERDOC_API_1_0_0*	rdc = nullptr;
+	bool				rdc_capture = false;
+
+	void				_CaptureInit();
+	void				_CaptureStart();
+	void				_CaptureEnd();
 
 	// Audio
 	HINSTANCE			hBass;
