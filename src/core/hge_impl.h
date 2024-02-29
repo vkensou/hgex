@@ -335,7 +335,7 @@ public:
 	std::unordered_map<uint32_t, CGPURenderPipelineId> default_shader_pipelines;
 	std::unordered_map<DescriptorSetKey, CGPUDescriptorSetId, DescriptorSetKeyHash> default_shader_descriptor_sets;
 	CGPUSamplerId linear_sampler, point_sampler;
-	std::vector<std::tuple<CGPUTextureId, CGPUTextureViewId>> deleted_textures;
+	std::vector<CTextureList*> deleted_textures;
 	CGPUBufferId per_frame_ubo;
 	CGPUDescriptorSetId per_frame_ubo_descriptor_sets[2];
 

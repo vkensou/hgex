@@ -435,9 +435,7 @@ void CALL HGE_Impl::Texture_Free(HTEXTURE tex)
 		{
 			if (texPrev) texPrev->next = pTextures->next;
 			else textures = pTextures->next;
-			deleted_textures.push_back(std::make_tuple(pTextures->tex, pTextures->tex_view));
-			if (pTextures->locked) free(pTextures->locked);
-			delete pTextures;
+			deleted_textures.push_back(pTextures);
 			break;
 		}
 		texPrev = pTextures;
@@ -1006,15 +1004,19 @@ void HGE_Impl::_GfxDone()
 	{
 		cgpu_free_descriptor_set(descriptor_set);
 	}
+	default_shader_descriptor_sets.clear();
 
 	freeShader(default_shaders[0]);
 	freeShader(default_shaders[1]);
 	memset(default_shaders, 0, sizeof(default_shaders));
 
-	for (auto [texture, texture_view] : deleted_textures)
+	for (auto texItem : deleted_textures)
 	{
-		cgpu_free_texture_view(texture_view);
-		cgpu_free_texture(texture);
+		if (texItem->locked) free(texItem->locked);
+		_DeleteDescriptorSet((HTEXTURE)texItem);
+		cgpu_free_texture_view(texItem->tex_view);
+		cgpu_free_texture(texItem->tex);
+		delete texItem;
 	}
 	deleted_textures.clear();
 
@@ -1057,11 +1059,13 @@ bool HGE_Impl::_GfxStart()
 	auto& cur_frame_data = frame_datas[current_frame_index];
 	cgpu_wait_fences(&cur_frame_data.inflight_fence, 1);
 
-	for (auto [texture, texture_view] : deleted_textures)
+	for (auto texItem : deleted_textures)
 	{
-		_DeleteDescriptorSet((HTEXTURE)texture_view);
-		cgpu_free_texture_view(texture_view);
-		cgpu_free_texture(texture);
+		if (texItem->locked) free(texItem->locked);
+		_DeleteDescriptorSet((HTEXTURE)texItem);
+		cgpu_free_texture_view(texItem->tex_view);
+		cgpu_free_texture(texItem->tex);
+		delete texItem;
 	}
 	deleted_textures.clear();
 
@@ -1294,7 +1298,7 @@ void HGE_Impl::_DeleteDescriptorSet(HTEXTURE tex)
 {
 	auto texItem = (CTextureList*)tex;
 	{
-		DescriptorSetKey key = { .tex = texItem, .sampler = true };
+		DescriptorSetKey key = { .tex = texItem, .sampler = true, .color = false };
 		auto iter = default_shader_descriptor_sets.find(key);
 		if (iter != default_shader_descriptor_sets.end())
 		{
@@ -1304,7 +1308,27 @@ void HGE_Impl::_DeleteDescriptorSet(HTEXTURE tex)
 	}
 
 	{
-		DescriptorSetKey key = { .tex = texItem, .sampler = false };
+		DescriptorSetKey key = { .tex = texItem, .sampler = false, .color = false };
+		auto iter = default_shader_descriptor_sets.find(key);
+		if (iter != default_shader_descriptor_sets.end())
+		{
+			cgpu_free_descriptor_set(iter->second);
+			default_shader_descriptor_sets.erase(iter);
+		}
+	}
+
+	{
+		DescriptorSetKey key = { .tex = texItem, .sampler = true, .color = true };
+		auto iter = default_shader_descriptor_sets.find(key);
+		if (iter != default_shader_descriptor_sets.end())
+		{
+			cgpu_free_descriptor_set(iter->second);
+			default_shader_descriptor_sets.erase(iter);
+		}
+	}
+
+	{
+		DescriptorSetKey key = { .tex = texItem, .sampler = false, .color = true };
 		auto iter = default_shader_descriptor_sets.find(key);
 		if (iter != default_shader_descriptor_sets.end())
 		{
