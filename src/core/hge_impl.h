@@ -333,7 +333,7 @@ public:
 	CVertexBufferList* cur_vertex_buffer;
 	CShader default_shaders[2];
 	std::unordered_map<uint32_t, CGPURenderPipelineId> default_shader_pipelines;
-	std::unordered_map<DescriptorSetKey, CGPUDescriptorSetId, DescriptorSetKeyHash> default_shader_descriptor_sets;
+	std::unordered_map<CTextureList*, std::unordered_map<uint32_t, CGPUDescriptorSetId>> default_shader_descriptor_sets;
 	CGPUSamplerId linear_sampler, point_sampler;
 	std::vector<CTextureList*> deleted_textures;
 	CGPUBufferId per_frame_ubo;

@@ -1003,9 +1003,13 @@ void HGE_Impl::_GfxDone()
 	}
 	default_shader_pipelines.clear();
 
-	for (auto [_, descriptor_set] : default_shader_descriptor_sets)
+	for (auto [texItem, descriptor_sets] : default_shader_descriptor_sets)
 	{
-		cgpu_free_descriptor_set(descriptor_set);
+		for (auto [_, descriptor_set] : descriptor_sets)
+		{
+			cgpu_free_descriptor_set(descriptor_set);
+		}
+		descriptor_sets.clear();
 	}
 	default_shader_descriptor_sets.clear();
 
@@ -1171,6 +1175,8 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType, bool blend, bool c
 			uint32_t pad : 28;
 		} sep;
 	} key;
+	
+	static_assert(sizeof(key.sep) == 4);
 
 	key.sep.primType = primType - 1;
 	key.sep.blend = blend;
@@ -1257,11 +1263,33 @@ CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(CTextureList* texItem, bool 
 		texItem = tex_white; color = false;
 	}
 
-	DescriptorSetKey key = { .tex = texItem, .sampler = linear, .color = color };
-	auto iter = default_shader_descriptor_sets.find(key);
-	if (iter != default_shader_descriptor_sets.end())
+	auto iter = default_shader_descriptor_sets.find(texItem);
+	if (iter == default_shader_descriptor_sets.end())
 	{
-		return iter->second;
+		default_shader_descriptor_sets.insert({ texItem, {} });
+	}
+	auto& sets = default_shader_descriptor_sets[texItem];
+
+	union
+	{
+		uint32_t value;
+		struct {
+			uint32_t linear : 1;
+			uint32_t color : 1;
+			uint32_t pad : 30;
+		} sep;
+	} key;
+
+	static_assert(sizeof(key.sep) == 4);
+
+	key.sep.linear = linear;
+	key.sep.color = color;
+	key.sep.pad = 0;
+
+	auto iter2 = sets.find(key.value);
+	if (iter2 != sets.end())
+	{
+		return iter2->second;
 	}
 	else
 	{
@@ -1289,7 +1317,7 @@ CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(CTextureList* texItem, bool 
 		};
 
 		cgpu_update_descriptor_set(descriptor_set, datas, 2);
-		default_shader_descriptor_sets.insert({ key, descriptor_set });
+		sets.insert({ key.value, descriptor_set });
 
 		return descriptor_set;
 	}
@@ -1297,44 +1325,15 @@ CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(CTextureList* texItem, bool 
 
 void HGE_Impl::_DeleteDescriptorSet(CTextureList* texItem)
 {
+	auto iter = default_shader_descriptor_sets.find(texItem);
+	if (iter != default_shader_descriptor_sets.end())
 	{
-		DescriptorSetKey key = { .tex = texItem, .sampler = true, .color = false };
-		auto iter = default_shader_descriptor_sets.find(key);
-		if (iter != default_shader_descriptor_sets.end())
+		for (auto [_, descriptor_set] : iter->second)
 		{
-			cgpu_free_descriptor_set(iter->second);
-			default_shader_descriptor_sets.erase(iter);
+			cgpu_free_descriptor_set(descriptor_set);
 		}
-	}
-
-	{
-		DescriptorSetKey key = { .tex = texItem, .sampler = false, .color = false };
-		auto iter = default_shader_descriptor_sets.find(key);
-		if (iter != default_shader_descriptor_sets.end())
-		{
-			cgpu_free_descriptor_set(iter->second);
-			default_shader_descriptor_sets.erase(iter);
-		}
-	}
-
-	{
-		DescriptorSetKey key = { .tex = texItem, .sampler = true, .color = true };
-		auto iter = default_shader_descriptor_sets.find(key);
-		if (iter != default_shader_descriptor_sets.end())
-		{
-			cgpu_free_descriptor_set(iter->second);
-			default_shader_descriptor_sets.erase(iter);
-		}
-	}
-
-	{
-		DescriptorSetKey key = { .tex = texItem, .sampler = false, .color = true };
-		auto iter = default_shader_descriptor_sets.find(key);
-		if (iter != default_shader_descriptor_sets.end())
-		{
-			cgpu_free_descriptor_set(iter->second);
-			default_shader_descriptor_sets.erase(iter);
-		}
+		iter->second.clear();
+		default_shader_descriptor_sets.erase(iter);
 	}
 }
 
