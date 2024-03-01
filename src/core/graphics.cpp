@@ -190,80 +190,46 @@ void CALL HGE_Impl::Gfx_EndScene()
 
 void CALL HGE_Impl::Gfx_RenderLine(float x1, float y1, float x2, float y2, DWORD color, float z)
 {
-	if (!prepared)
-		Gfx_Clear(0);
+	hgeVertex line[2];
+	line[0].x = x1; line[1].x = x2;
+	line[0].y = y1; line[1].y = y2;
+	line[0].z = line[1].z = z;
+	line[0].col = line[1].col = color;
+	line[0].tx = line[1].tx =
+		line[0].ty = line[1].ty = 0.0f;
 
-	if (VertArray)
-	{
-		if (CurPrimType != HGEPRIM_LINES || cur_vertex_buffer->vb_eaten + HGEPRIM_LINES > VERTEX_BUFFER_SIZE || CurTexture || CurBlendMode != BLEND_DEFAULT)
-		{
-			_render_batch();
-
-			CurPrimType = HGEPRIM_LINES;
-			if (CurBlendMode != BLEND_DEFAULT) _SetBlendMode(BLEND_DEFAULT);
-			if (CurTexture)
-			{
-				CurTexture = 0;
-			}
-		}
-
-		int i = nPrim * HGEPRIM_LINES;
-		hgeVertex line[2];
-		line[0].x = x1; line[1].x = x2;
-		line[0].y = y1; line[1].y = y2;
-		line[0].z = line[1].z = z;
-		line[0].col = line[1].col = color;
-		line[0].tx = line[1].tx =
-			line[0].ty = line[1].ty = 0.0f;
-
-		_UploadVertexData(line);
-	}
+	_RenderPrim(HGEPRIM_LINES, line, NULL, BLEND_DEFAULT);
 }
 
 void CALL HGE_Impl::Gfx_RenderTriple(const hgeTriple *triple)
+{
+	_RenderPrim(HGEPRIM_TRIPLES, triple->v, (CTextureList*)triple->tex, triple->blend);
+}
+
+void CALL HGE_Impl::Gfx_RenderQuad(const hgeQuad *quad)
+{
+	_RenderPrim(HGEPRIM_QUADS, quad->v, (CTextureList*)quad->tex, quad->blend);
+}
+
+void HGE_Impl::_RenderPrim(int prim_type, const hgeVertex* v, const CTextureList* tex, int blend)
 {
 	if (!prepared)
 		Gfx_Clear(0);
 
 	if (VertArray)
 	{
-		auto tex = (CTextureList*)triple->tex;
-		if (CurPrimType != HGEPRIM_TRIPLES || cur_vertex_buffer->vb_eaten + HGEPRIM_TRIPLES > VERTEX_BUFFER_SIZE || CurTexture != tex || CurBlendMode != triple->blend)
+		if (CurPrimType != prim_type || cur_vertex_buffer->vb_eaten + prim_type > VERTEX_BUFFER_SIZE || CurTexture != tex || CurBlendMode != blend)
 		{
 			_render_batch();
 
-			CurPrimType = HGEPRIM_TRIPLES;
-			if (CurBlendMode != triple->blend) _SetBlendMode(triple->blend);
+			CurPrimType = prim_type;
+			if (CurBlendMode != blend) _SetBlendMode(blend);
 			if (tex != CurTexture) {
 				CurTexture = tex;
 			}
 		}
 
-		_UploadVertexData(triple->v);
-	}
-}
-
-void CALL HGE_Impl::Gfx_RenderQuad(const hgeQuad *quad)
-{
-	if (!prepared)
-		Gfx_Clear(0);
-
-	if (VertArray)
-	{
-		auto tex = (CTextureList*)quad->tex;
-		if (CurPrimType != HGEPRIM_QUADS || cur_vertex_buffer->vb_eaten + HGEPRIM_QUADS > VERTEX_BUFFER_SIZE || CurTexture != tex || CurBlendMode != quad->blend)
-		{
-			_render_batch();
-
-			CurPrimType = HGEPRIM_QUADS;
-			if (CurBlendMode != quad->blend) _SetBlendMode(quad->blend);
-			if (tex != CurTexture)
-			{
-				CurTexture = tex;
-			}
-		}
-
-		_UploadVertexData(quad->v);
+		_UploadVertexData(v);
 	}
 }
 
@@ -1257,7 +1223,7 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType, bool blend, bool c
 	}
 }
 
-CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(CTextureList* texItem, bool linear, bool color)
+CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(const CTextureList* texItem, bool linear, bool color)
 {
 	if (texItem == NULL) {
 		texItem = tex_white; color = false;
@@ -1323,7 +1289,7 @@ CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(CTextureList* texItem, bool 
 	}
 }
 
-void HGE_Impl::_DeleteDescriptorSet(CTextureList* texItem)
+void HGE_Impl::_DeleteDescriptorSet(const CTextureList* texItem)
 {
 	auto iter = default_shader_descriptor_sets.find(texItem);
 	if (iter != default_shader_descriptor_sets.end())

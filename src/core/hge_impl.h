@@ -333,7 +333,7 @@ public:
 	CVertexBufferList* cur_vertex_buffer;
 	CShader default_shaders[2];
 	std::unordered_map<uint32_t, CGPURenderPipelineId> default_shader_pipelines;
-	std::unordered_map<CTextureList*, std::unordered_map<uint32_t, CGPUDescriptorSetId>> default_shader_descriptor_sets;
+	std::unordered_map<const CTextureList*, std::unordered_map<uint32_t, CGPUDescriptorSetId>> default_shader_descriptor_sets;
 	CGPUSamplerId linear_sampler, point_sampler;
 	std::vector<CTextureList*> deleted_textures;
 	CGPUBufferId per_frame_ubo;
@@ -350,7 +350,7 @@ public:
 	int					nPrim;
 	int					CurPrimType;
 	int					CurBlendMode;
-	CTextureList*		CurTexture;
+	const CTextureList*		CurTexture;
 	CGPURenderPipelineId CurDefaultShaderPipeline;
 	CGPUDescriptorSetId CurDefaultDescriptorSet;
 
@@ -367,11 +367,12 @@ public:
 	void				_SetProjectionMatrix(int width, int height);
 	CGPUCommandBufferId	_RequestCmd(PerFrameData &frame_data);
 	CGPURenderPipelineId _RequestPipeline(int primType, bool blend, bool color);
-	CGPUDescriptorSetId _RequestDescriptorSet(CTextureList* texItem, bool sampler, bool color);
-	void				_DeleteDescriptorSet(CTextureList* texItem);
+	CGPUDescriptorSetId _RequestDescriptorSet(const CTextureList* texItem, bool sampler, bool color);
+	void				_DeleteDescriptorSet(const CTextureList* texItem);
 	bool				_OutOfVertexBugets(uint32_t request_vertex_count, uint32_t request_index_count);
 	void				_UploadVertexData(const hgeVertex* v);
 	void				_ExpandVertexBuffer();
+	void				_RenderPrim(int prim_type, const hgeVertex* v, const CTextureList* tex, int blend);
 
 	// Render Capture
 	RENDERDOC_API_1_0_0*	rdc = nullptr;
