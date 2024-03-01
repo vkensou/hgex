@@ -373,6 +373,7 @@ public:
 	void				_UploadVertexData(const hgeVertex* v);
 	void				_ExpandVertexBuffer();
 	void				_RenderPrim(int prim_type, const hgeVertex* v, const CTextureList* tex, int blend);
+	void				_FreeDeletedTextures();
 
 	// Render Capture
 	RENDERDOC_API_1_0_0*	rdc = nullptr;

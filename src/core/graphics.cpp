@@ -900,12 +900,12 @@ void HGE_Impl::_Resize(int width, int height)
 
 void HGE_Impl::_GfxDone()
 {
+	cgpu_wait_queue_idle(gfx_queue);
+	cgpu_wait_queue_idle(present_queue);
+
 	while (textures)	
 		Texture_Free((HTEXTURE)textures);
 	tex_white = NULL;
-
-	cgpu_wait_queue_idle(gfx_queue);
-	cgpu_wait_queue_idle(present_queue);
 
 	cgpu_free_semaphore(render_finished_semaphore);
 	render_finished_semaphore = CGPU_NULLPTR;
@@ -962,7 +962,6 @@ void HGE_Impl::_GfxDone()
 		delete prev;
 	}
 
-
 	for (auto [_, pipeline] : default_shader_pipelines)
 	{
 		cgpu_free_render_pipeline(pipeline);
@@ -983,15 +982,7 @@ void HGE_Impl::_GfxDone()
 	freeShader(default_shaders[1]);
 	memset(default_shaders, 0, sizeof(default_shaders));
 
-	for (auto texItem : deleted_textures)
-	{
-		if (texItem->locked) free(texItem->locked);
-		_DeleteDescriptorSet(texItem);
-		cgpu_free_texture_view(texItem->tex_view);
-		cgpu_free_texture(texItem->tex);
-		delete texItem;
-	}
-	deleted_textures.clear();
+	_FreeDeletedTextures();
 
 	cgpu_free_buffer(per_frame_ubo);
 	per_frame_ubo = CGPU_NULLPTR;
@@ -999,14 +990,6 @@ void HGE_Impl::_GfxDone()
 	cgpu_free_descriptor_set(per_frame_ubo_descriptor_sets[0]);
 	cgpu_free_descriptor_set(per_frame_ubo_descriptor_sets[1]);
 	memset(per_frame_ubo_descriptor_sets, 0, sizeof(per_frame_ubo_descriptor_sets));
-
-	// for (auto shader : deleted_shaders)
-	// 	deleteShaderImpl(shader);
-	// deleted_shaders.clear();
-
-	// for (auto image : deleted_images)
-	// 	deleteImageImpl(image);
-	// deleted_images.clear();
 
 	cgpu_free_render_pass(render_pass);
 	render_pass = CGPU_NULLPTR;
@@ -1032,15 +1015,7 @@ bool HGE_Impl::_GfxStart()
 	auto& cur_frame_data = frame_datas[current_frame_index];
 	cgpu_wait_fences(&cur_frame_data.inflight_fence, 1);
 
-	for (auto texItem : deleted_textures)
-	{
-		if (texItem->locked) free(texItem->locked);
-		_DeleteDescriptorSet(texItem);
-		cgpu_free_texture_view(texItem->tex_view);
-		cgpu_free_texture(texItem->tex);
-		delete texItem;
-	}
-	deleted_textures.clear();
+	_FreeDeletedTextures();
 
 	prepared = false;
 	nPrim = 0;
@@ -1332,4 +1307,17 @@ void HGE_Impl::_ExpandVertexBuffer()
 	VertArray = (hgeVertex*)cur_vertex_buffer->pVB->info->cpu_mapped_address;
 	cur_vertex_buffer->ib_eaten = 0;
 	cur_vertex_buffer->vb_eaten = 0;
+}
+
+void HGE_Impl::_FreeDeletedTextures()
+{
+	for (auto texItem : deleted_textures)
+	{
+		if (texItem->locked) free(texItem->locked);
+		_DeleteDescriptorSet(texItem);
+		cgpu_free_texture_view(texItem->tex_view);
+		cgpu_free_texture(texItem->tex);
+		delete texItem;
+	}
+	deleted_textures.clear();
 }
