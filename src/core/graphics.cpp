@@ -227,14 +227,15 @@ void CALL HGE_Impl::Gfx_RenderTriple(const hgeTriple *triple)
 
 	if (VertArray)
 	{
-		if (CurPrimType != HGEPRIM_TRIPLES || cur_vertex_buffer->vb_eaten + HGEPRIM_TRIPLES > VERTEX_BUFFER_SIZE || CurTexture != triple->tex || CurBlendMode != triple->blend)
+		auto tex = (CTextureList*)triple->tex;
+		if (CurPrimType != HGEPRIM_TRIPLES || cur_vertex_buffer->vb_eaten + HGEPRIM_TRIPLES > VERTEX_BUFFER_SIZE || CurTexture != tex || CurBlendMode != triple->blend)
 		{
 			_render_batch();
 
 			CurPrimType = HGEPRIM_TRIPLES;
 			if (CurBlendMode != triple->blend) _SetBlendMode(triple->blend);
-			if (triple->tex != CurTexture) {
-				CurTexture = triple->tex;
+			if (tex != CurTexture) {
+				CurTexture = tex;
 			}
 		}
 
@@ -249,15 +250,16 @@ void CALL HGE_Impl::Gfx_RenderQuad(const hgeQuad *quad)
 
 	if (VertArray)
 	{
-		if (CurPrimType != HGEPRIM_QUADS || cur_vertex_buffer->vb_eaten + HGEPRIM_QUADS > VERTEX_BUFFER_SIZE || CurTexture != quad->tex || CurBlendMode != quad->blend)
+		auto tex = (CTextureList*)quad->tex;
+		if (CurPrimType != HGEPRIM_QUADS || cur_vertex_buffer->vb_eaten + HGEPRIM_QUADS > VERTEX_BUFFER_SIZE || CurTexture != tex || CurBlendMode != quad->blend)
 		{
 			_render_batch();
 
 			CurPrimType = HGEPRIM_QUADS;
 			if (CurBlendMode != quad->blend) _SetBlendMode(quad->blend);
-			if (quad->tex != CurTexture)
+			if (tex != CurTexture)
 			{
-				CurTexture = quad->tex;
+				CurTexture = tex;
 			}
 		}
 
@@ -265,13 +267,14 @@ void CALL HGE_Impl::Gfx_RenderQuad(const hgeQuad *quad)
 	}
 }
 
-hgeVertex* CALL HGE_Impl::Gfx_StartBatch(int prim_type, HTEXTURE tex, int blend, int *max_prim)
+hgeVertex* CALL HGE_Impl::Gfx_StartBatch(int prim_type, HTEXTURE batch_tex, int blend, int *max_prim)
 {
 	if (!prepared)
 		Gfx_Clear(0);
 
 	if (VertArray)
 	{
+		auto tex = (CTextureList*)batch_tex;
 		if (CurPrimType != prim_type || cur_vertex_buffer->vb_eaten + prim_type > VERTEX_BUFFER_SIZE || CurTexture != tex || CurBlendMode != blend)
 		{
 			_render_batch();
@@ -891,10 +894,10 @@ bool HGE_Impl::_GfxInit()
 	cgpu_update_descriptor_set(per_frame_ubo_descriptor_sets[0], datas, 1);
 	cgpu_update_descriptor_set(per_frame_ubo_descriptor_sets[1], datas, 1);
 
-	tex_white = Texture_Create(1, 1);
-	auto pixels = Texture_Lock(tex_white);
+	tex_white = (CTextureList*)Texture_Create(1, 1);
+	auto pixels = Texture_Lock((HTEXTURE)tex_white);
 	*pixels = RGBA(0xff, 0xff, 0xff, 0xff);
-	Texture_Unlock(tex_white);
+	Texture_Unlock((HTEXTURE)tex_white);
 
 	return true;
 }
@@ -1013,7 +1016,7 @@ void HGE_Impl::_GfxDone()
 	for (auto texItem : deleted_textures)
 	{
 		if (texItem->locked) free(texItem->locked);
-		_DeleteDescriptorSet((HTEXTURE)texItem);
+		_DeleteDescriptorSet(texItem);
 		cgpu_free_texture_view(texItem->tex_view);
 		cgpu_free_texture(texItem->tex);
 		delete texItem;
@@ -1062,7 +1065,7 @@ bool HGE_Impl::_GfxStart()
 	for (auto texItem : deleted_textures)
 	{
 		if (texItem->locked) free(texItem->locked);
-		_DeleteDescriptorSet((HTEXTURE)texItem);
+		_DeleteDescriptorSet(texItem);
 		cgpu_free_texture_view(texItem->tex_view);
 		cgpu_free_texture(texItem->tex);
 		delete texItem;
@@ -1248,14 +1251,12 @@ CGPURenderPipelineId HGE_Impl::_RequestPipeline(int primType, bool blend, bool c
 	}
 }
 
-CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear, bool color)
+CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(CTextureList* texItem, bool linear, bool color)
 {
-	if (tex == NULL) {
-		tex = tex_white; color = false;
+	if (texItem == NULL) {
+		texItem = tex_white; color = false;
 	}
-	auto texItem = (CTextureList*)tex;
-	if (!texItem)
-		return CGPU_NULLPTR;
+
 	DescriptorSetKey key = { .tex = texItem, .sampler = linear, .color = color };
 	auto iter = default_shader_descriptor_sets.find(key);
 	if (iter != default_shader_descriptor_sets.end())
@@ -1294,9 +1295,8 @@ CGPUDescriptorSetId HGE_Impl::_RequestDescriptorSet(HTEXTURE tex, bool linear, b
 	}
 }
 
-void HGE_Impl::_DeleteDescriptorSet(HTEXTURE tex)
+void HGE_Impl::_DeleteDescriptorSet(CTextureList* texItem)
 {
-	auto texItem = (CTextureList*)tex;
 	{
 		DescriptorSetKey key = { .tex = texItem, .sampler = true, .color = false };
 		auto iter = default_shader_descriptor_sets.find(key);

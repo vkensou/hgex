@@ -345,12 +345,12 @@ public:
 	CTextureList*		textures;
 	CVertexBufferList*	vertexBuffers;
 	hgeVertex*			VertArray;
-	HTEXTURE			tex_white;
+	CTextureList*		tex_white;
 
 	int					nPrim;
 	int					CurPrimType;
 	int					CurBlendMode;
-	HTEXTURE			CurTexture;
+	CTextureList*		CurTexture;
 	CGPURenderPipelineId CurDefaultShaderPipeline;
 	CGPUDescriptorSetId CurDefaultDescriptorSet;
 
@@ -367,8 +367,8 @@ public:
 	void				_SetProjectionMatrix(int width, int height);
 	CGPUCommandBufferId	_RequestCmd(PerFrameData &frame_data);
 	CGPURenderPipelineId _RequestPipeline(int primType, bool blend, bool color);
-	CGPUDescriptorSetId _RequestDescriptorSet(HTEXTURE tex, bool sampler, bool color);
-	void				_DeleteDescriptorSet(HTEXTURE tex);
+	CGPUDescriptorSetId _RequestDescriptorSet(CTextureList* texItem, bool sampler, bool color);
+	void				_DeleteDescriptorSet(CTextureList* texItem);
 	bool				_OutOfVertexBugets(uint32_t request_vertex_count, uint32_t request_index_count);
 	void				_UploadVertexData(const hgeVertex* v);
 	void				_ExpandVertexBuffer();
