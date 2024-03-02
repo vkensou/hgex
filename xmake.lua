@@ -18,6 +18,7 @@ add_requires("minizip", "libpng")
 add_requires("cgpu")
 add_requires("freeimage")
 add_requires("glm")
+add_requires("wasm-micro-runtime")
 
 target("bass")
     set_kind("headeronly")
@@ -144,6 +145,12 @@ target("texasm")
         os.cp(path.join(target:targetdir(), "texasm.exe"), "tools/texasm")
     end)
 
+target("bootstrapofwasm")
+    set_kind("binary")
+    set_rundir("$(projectdir)/tutorials/precompiled")
+    add_packages("wasm-micro-runtime")
+    add_files("src/bootstrapofwasm/*.cpp")
+
 rule("tutorial_base")
     add_deps("win.sdk.application")
 
@@ -191,3 +198,27 @@ target("tutorial08")
     add_rules("tutorial_base")
 
     add_files("tutorials/tutorial08/*.cpp")
+
+rule("wasm_tutorial_base")
+
+    after_load(function(target)
+        target:set("plat", "wasm")
+        target:set("toolchains", "emcc")
+        target:set("kind", "binary")
+        -- target:add("add", cxflags("-O3"))
+        -- add_ldflags("-sERROR_ON_UNDEFINED_SYMBOLS=0")
+    end)
+
+    after_build(function(target)
+        local dir = target:targetdir()
+        local filename = target:basename() .. ".wasm"
+        local filepath = path.join(dir, filename)
+        local outdir = "tutorials/precompiled"
+        os.mkdir(outdir)
+        os.cp(filepath, outdir)
+    end)
+rule_end()
+
+target("wasm_tutorial01")
+    add_rules("wasm_tutorial_base")
+    add_files("tutorials/wasmtutorial01/*.cpp")
