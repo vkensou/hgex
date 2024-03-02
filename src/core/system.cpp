@@ -702,7 +702,7 @@ HGE_Impl::HGE_Impl()
 		strcat(szCurPath, "/");
 }
 
-void HGE_Impl::_PostError(char *error)
+void HGE_Impl::_PostError(const char *error)
 {
 	System_Log(error);
 	strcpy(szError,error);

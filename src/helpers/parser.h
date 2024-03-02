@@ -45,30 +45,30 @@ enum
 class RScriptParser
 {
 public:
-	RScriptParser(char *name, char *scr);
+	RScriptParser(const char *name, const char *scr);
 	~RScriptParser() { hge->Release(); }
 
 	int		get_token();
 	void	put_back()	 { script-=strlen(tokenvalue); }
 	int		get_line()	 { return line;}
-	char*	get_name()	 { return scriptname;}
+	const char*	get_name()	 { return scriptname;}
 
-	char*	tkn_string() { return tokenvalue; }
+	const char*	tkn_string() { return tokenvalue; }
 	int		tkn_int()    { return atoi(tokenvalue); }
 	float	tkn_float()  { return (float)atof(tokenvalue); }
 	bool	tkn_bool()   { return (tokenvalue[0]=='t' || tokenvalue[0]=='T') ? true : false; }
 	DWORD	tkn_hex();
 
-	void	ScriptPostError(char *msg1, char *msg2);
+	void	ScriptPostError(const char *msg1, const char *msg2);
 
 	int		tokentype;
 	char	tokenvalue[128];
-	char*	script;
-	char*	scriptname;
+	const char*	script;
+	const char*	scriptname;
 	int		line;
 
 private:
-	bool	strtkcmp(char *str, char *mem);
+	bool	strtkcmp(const char *str, const char *mem);
 
 	static HGE *hge;
 };

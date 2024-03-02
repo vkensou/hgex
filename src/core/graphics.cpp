@@ -532,7 +532,7 @@ CVertexBufferList* createVertexBuffer(CGPUDeviceId device, uint32_t vertex_buffe
 
 	if (!pIB)
 	{
-		return false;
+		return 0;
 	}
 
 	CGPUBufferRange ib_range = { .offset = 0, .size = ib_size };

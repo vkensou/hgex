@@ -10,7 +10,7 @@
 #include "hge_impl.h"
 
 
-char *KeyNames[] =
+const char *KeyNames[] =
 {
  "?",
  "Left Mouse Button", "Right Mouse Button", "?", "Middle Mouse Button",
@@ -103,7 +103,7 @@ bool CALL HGE_Impl::Input_KeyUp(int key)
 	return (keyz[key] & 2) != 0;
 }
 
-char* CALL HGE_Impl::Input_GetKeyName(int key)
+const char* CALL HGE_Impl::Input_GetKeyName(int key)
 {
 	return KeyNames[key];
 }

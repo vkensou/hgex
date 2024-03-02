@@ -381,7 +381,7 @@ public:
 	virtual bool		CALL	Input_KeyDown(int key) = 0;
 	virtual bool		CALL	Input_KeyUp(int key) = 0;
 	virtual bool		CALL	Input_GetKeyState(int key) = 0;
-	virtual char*		CALL	Input_GetKeyName(int key) = 0;
+	virtual const char*	CALL	Input_GetKeyName(int key) = 0;
 	virtual int			CALL	Input_GetKey() = 0;
 	virtual int			CALL	Input_GetChar() = 0;
 	virtual bool		CALL	Input_GetEvent(hgeInputEvent *event) = 0;
