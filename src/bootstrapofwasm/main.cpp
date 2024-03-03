@@ -3,6 +3,7 @@
 #include <fstream>
 #include <tuple>
 #include "hge.h"
+#include "hgex_wrapper.h"
 
 std::tuple<wasm_module_t, uint8_t*> wasm_load_module_from_file(std::filesystem::path path)
 {
@@ -29,7 +30,6 @@ std::tuple<wasm_module_t, uint8_t*> wasm_load_module_from_file(std::filesystem::
 	return std::make_tuple(module, data);
 }
 
-HGE* hge = NULL;
 wasm_module_t main_module = NULL;
 wasm_module_inst_t main_module_inst = NULL;
 wasm_exec_env_t main_exec_env = NULL;
@@ -112,7 +112,7 @@ void exec_main_module()
 
 	if (func_init && func_frame)
 	{
-		hge->System_SetState(HGE_TITLE, "HGE Wasm Tutorial");
+		hge->System_SetState(HGE_TITLE, "HGE Wasm App");
 		hge->System_SetState(HGE_WINDOWED, true);
 
 		if (!wasm_runtime_call_wasm_a(main_exec_env, func_init, 0, nullptr, 0, nullptr))
@@ -164,6 +164,8 @@ int main()
 	{
 		return 1;
 	}
+
+	wasm_register_hge_apis();
 
 	auto [main_module, main_module_data] = wasm_load_module_from_file(path);
 	if (main_module)
