@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <fstream>
 #include <tuple>
+#include "hge.h"
 
 std::tuple<wasm_module_t, uint8_t*> wasm_load_module_from_file(std::filesystem::path path)
 {
@@ -28,74 +29,128 @@ std::tuple<wasm_module_t, uint8_t*> wasm_load_module_from_file(std::filesystem::
 	return std::make_tuple(module, data);
 }
 
-void exec_main_module(wasm_module_t main_module)
+HGE* hge = NULL;
+wasm_module_t main_module = NULL;
+wasm_module_inst_t main_module_inst = NULL;
+wasm_exec_env_t main_exec_env = NULL;
+wasm_function_inst_t func_init = NULL;
+wasm_function_inst_t func_frame = NULL;
+wasm_function_inst_t func_render = NULL;
+wasm_function_inst_t func_exit = NULL;
+
+bool FrameFunc()
+{
+	wasm_val_t results[1] = { {.kind = WASM_I32, .of = {.i32 = 0}} };
+
+	if (wasm_runtime_call_wasm_a(main_exec_env, func_frame, 1, results, 0, nullptr))
+	{
+		int ret_val;
+		ret_val = results[0].of.i32;
+		return ret_val;
+	}
+	else
+	{
+		const char* exception;
+		if ((exception = wasm_runtime_get_exception(main_module_inst)))
+			std::printf("%s\n", exception);
+		return true;
+	}
+}
+
+bool RenderFunc()
+{
+	return false;
+}
+
+bool ExitFunc()
+{
+	return false;
+}
+
+void exec_main_module()
 {
 	char error_buf[128];
 	size_t stack_size = 8092, heap_size = 8092;
 	static char global_heap_buf[512 * 1024];
 
-	auto main_module_inst = wasm_runtime_instantiate(main_module, stack_size, heap_size, error_buf, sizeof(error_buf));
+	main_module_inst = wasm_runtime_instantiate(main_module, stack_size, heap_size, error_buf, sizeof(error_buf));
 	if (!main_module_inst)
 	{
 		std::printf(error_buf);
 	}
 
-	wasm_exec_env_t exec_env = NULL;
 	if (main_module_inst)
 	{
-		exec_env = wasm_runtime_create_exec_env(main_module_inst, stack_size);
-		if (!exec_env)
+		main_exec_env = wasm_runtime_create_exec_env(main_module_inst, stack_size);
+		if (!main_exec_env)
 		{
 			printf("Create wasm execution environment failed.\n");
 		}
 	}
 
-	wasm_function_inst_t func = NULL;
-	if (exec_env)
+	if (main_exec_env)
 	{
-		auto func_name = "add";
-		func = wasm_runtime_lookup_function(main_module_inst, func_name, NULL);
-		if (!func)
+		auto func_init_name = "_app_init";
+		auto func_frame_name = "_app_frame";
+		auto func_render_name = "_app_render";
+		auto func_exit_name = "_app_exit";
+
+		func_init = wasm_runtime_lookup_function(main_module_inst, func_init_name, NULL);
+		func_frame = wasm_runtime_lookup_function(main_module_inst, func_frame_name, NULL);
+		func_render = wasm_runtime_lookup_function(main_module_inst, func_render_name, NULL);
+		func_exit = wasm_runtime_lookup_function(main_module_inst, func_exit_name, NULL);
+
+		if (!func_init)
 		{
-			std::printf("The %s wasm function is not found.\n", func_name);
+			std::printf("The %s function is not found.\n", func_init_name);
+		}
+		if (!func_frame)
+		{
+			std::printf("The %s function is not found.\n", func_frame_name);
 		}
 	}
 
-	if (func)
+	if (func_init && func_frame)
 	{
-		wasm_val_t results[1] = { {.kind = WASM_I32, .of = {.i32 = 0}} };
-		wasm_val_t arguments[2] =
-		{
-			{.kind = WASM_I32, .of = {.i32 = 10} },
-			{.kind = WASM_I32, .of = {.i32 = 114}},
-		};
+		hge->System_SetState(HGE_TITLE, "HGE Wasm Tutorial");
+		hge->System_SetState(HGE_WINDOWED, true);
 
-		if (wasm_runtime_call_wasm_a(exec_env, func, 1, results, 2, arguments))
-		{
-			int ret_val;
-			ret_val = results[0].of.i32;
-			printf("Native finished calling wasm function add(), returned a "
-				"float value: %d\n",
-				ret_val);
-		}
-		else
+		if (!wasm_runtime_call_wasm_a(main_exec_env, func_init, 0, nullptr, 0, nullptr))
 		{
 			const char* exception;
 			if ((exception = wasm_runtime_get_exception(main_module_inst)))
 				std::printf("%s\n", exception);
 		}
+
+		hge->System_SetState(HGE_FRAMEFUNC, FrameFunc);
+		if (func_render)
+			hge->System_SetState(HGE_FRAMEFUNC, RenderFunc);
+		if (func_exit)
+			hge->System_SetState(HGE_FRAMEFUNC, ExitFunc);
+
+		if (hge->System_Initiate())
+			hge->System_Start();
 	}
 
-	if (exec_env)
-		wasm_runtime_destroy_exec_env(exec_env);
+	if (main_exec_env)
+		wasm_runtime_destroy_exec_env(main_exec_env);
 
 	if (main_module_inst)
 		wasm_runtime_deinstantiate(main_module_inst);
+
+	main_module_inst = NULL;
+	main_exec_env = NULL;
+	func_init = NULL;
+	func_frame = NULL;
+	func_render = NULL;
+	func_exit = NULL;
 }
 
 int main()
 {
 	std::string path = "wasm_tutorial01.wasm";
+
+	hge = hgeCreate(HGE_VERSION);
 
 	RuntimeInitArgs init_args;
 	memset(&init_args, 0, sizeof(RuntimeInitArgs));
@@ -113,13 +168,19 @@ int main()
 	auto [main_module, main_module_data] = wasm_load_module_from_file(path);
 	if (main_module)
 	{
-		exec_main_module(main_module);
+		::main_module = main_module;
+		exec_main_module();
 
 		wasm_runtime_unload(main_module);
 		free(main_module_data);
+		::main_module = NULL;
 	}
 
 	wasm_runtime_destroy();
+
+	hge->System_Shutdown();
+	hge->Release();
+	hge = NULL;
 
 	return 0;
 }

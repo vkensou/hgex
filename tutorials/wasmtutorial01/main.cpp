@@ -1,11 +1,11 @@
-__attribute__((export_name("add")))
-int add(int a, int b)
+__attribute__((export_name("_app_init")))
+void init()
 {
-    return a + b;
+
 }
 
-__attribute__((export_name("add2")))
-int add2(int a, int b)
+__attribute__((export_name("_app_frame")))
+bool frame()
 {
-    return a + b;
+    return false;
 }
