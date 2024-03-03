@@ -1,6 +1,4 @@
 add_rules("mode.debug", "mode.release", "mode.releasedbg")
-add_cxflags("/EHsc")
-add_cxflags("/permissive")
 set_languages("cxx20")
 
 package("cgpu")
@@ -13,6 +11,8 @@ package("cgpu")
         import("package.tools.xmake").install(package, {}, {target="cgpu"})
     end)
 package_end()
+
+includes("wamr.lua")
 
 add_requires("minizip", "libpng")
 add_requires("cgpu")
@@ -203,7 +203,7 @@ rule("wasm_tutorial_base")
 
     after_load(function(target)
         target:set("plat", "wasm")
-        target:set("toolchains", "emcc")
+        target:set("toolchains", "wasi")
         target:set("kind", "binary")
         -- target:add("add", cxflags("-O3"))
         -- add_ldflags("-sERROR_ON_UNDEFINED_SYMBOLS=0")
@@ -211,11 +211,12 @@ rule("wasm_tutorial_base")
 
     after_build(function(target)
         local dir = target:targetdir()
-        local filename = target:basename() .. ".wasm"
+        local filename = target:basename() .. ".html"
         local filepath = path.join(dir, filename)
         local outdir = "tutorials/precompiled"
         os.mkdir(outdir)
         os.cp(filepath, outdir)
+        os.mv(path.join(outdir, filename), path.join(outdir, target:basename() .. ".wasm"))
     end)
 rule_end()
 
