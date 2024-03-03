@@ -75,6 +75,7 @@ target("hgexhelpers")
 
 target("particleed")
     set_kind("binary")
+    set_group("tools")
     set_rundir("$(projectdir)/tools/particleed")
 
     add_rules("win.sdk.application")
@@ -89,6 +90,7 @@ target("particleed")
 
 target("fonted")
     set_kind("binary")
+    set_group("tools")
     set_rundir("$(projectdir)/tools/fonted")
 
     add_rules("win.sdk.application")
@@ -104,6 +106,7 @@ target("fonted")
 
 target("fontconv")
     set_kind("binary")
+    set_group("tools")
     set_rundir("$(projectdir)/tools/fonted")
 
     add_deps("hgex", "hgexhelpers")
@@ -117,6 +120,7 @@ target("fontconv")
 
 target("pngopt")
     set_kind("binary")
+    set_group("tools")
     set_rundir("$(projectdir)/tools/fonted")
 
     add_deps("hgex", "hgexhelpers")
@@ -132,6 +136,7 @@ target("pngopt")
 
 target("texasm")
     set_kind("binary")
+    set_group("tools")
     set_rundir("$(projectdir)/tools/fonted")
 
     add_deps("hgex", "hgexhelpers")
@@ -156,48 +161,15 @@ rule("tutorial_base")
 
     after_load(function(target)
         target:add("deps", "hgex", "hgexhelpers")
+        target:set("group", "tutorials")
         target:set("rundir", "$(projectdir)/tutorials/precompiled")
     end)
 
-target("tutorial01")
-    add_rules("tutorial_base")
-
-    add_files("tutorials/tutorial01/*.cpp")
-
-target("tutorial02")
-    add_rules("tutorial_base")
-
-    add_files("tutorials/tutorial02/*.cpp")
-
-target("tutorial03")
-    add_rules("tutorial_base")
-
-    add_files("tutorials/tutorial03/*.cpp")
-
-target("tutorial04")
-    add_rules("tutorial_base")
-
-    add_files("tutorials/tutorial04/*.cpp")
-
-target("tutorial05")
-    add_rules("tutorial_base")
-
-    add_files("tutorials/tutorial05/*.cpp")
-
-target("tutorial06")
-    add_rules("tutorial_base")
-
-    add_files("tutorials/tutorial06/*.cpp")
-
-target("tutorial07")
-    add_rules("tutorial_base")
-
-    add_files("tutorials/tutorial07/*.cpp")
-
-target("tutorial08")
-    add_rules("tutorial_base")
-
-    add_files("tutorials/tutorial08/*.cpp")
+for _, dir in ipairs(os.filedirs("tutorials/tutorial*")) do
+    target(path.basename(dir))
+        add_rules("tutorial_base")
+        add_files(path.join(dir, "*.cpp"))
+end
 
 rule("wasm_tutorial_base")
 
@@ -205,8 +177,7 @@ rule("wasm_tutorial_base")
         target:set("plat", "wasm")
         target:set("toolchains", "wasi")
         target:set("kind", "binary")
-        -- target:add("add", cxflags("-O3"))
-        -- add_ldflags("-sERROR_ON_UNDEFINED_SYMBOLS=0")
+        target:set("group", "wasm_tutorials")
     end)
 
     after_build(function(target)
