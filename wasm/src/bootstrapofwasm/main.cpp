@@ -149,7 +149,7 @@ void exec_main_module()
 int main(int argc, char *argv[])
 {
 	std::string path;
-	if (argc > 0)
+	if (argc > 1)
 		path = argv[1];
 
 	hge = hgeCreate(HGE_VERSION);
