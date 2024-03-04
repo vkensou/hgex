@@ -146,9 +146,11 @@ void exec_main_module()
 	func_exit = NULL;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
-	std::string path = "wasm_tutorial01.wasm";
+	std::string path;
+	if (argc > 0)
+		path = argv[1];
 
 	hge = hgeCreate(HGE_VERSION);
 

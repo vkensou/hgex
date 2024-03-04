@@ -1,4 +1,5 @@
 add_rules("mode.debug", "mode.release", "mode.releasedbg")
+add_cxflags("/EHsc")
 set_languages("cxx20")
 
 package("cgpu")
