@@ -11,16 +11,11 @@ enum hgeStringState
 	HGESTRINGSTATE_FORCE_DWORD = 0x7FFFFFFF
 };
 
+[[clang::import_module("hge"), clang::import_name("System_SetState")]]
+void hge_system_set_state(hgeStringState state, const char* value);
 
-void System_SetState(hgeStringState state, const char* value) __attribute__((
-	__import_module__("hge"),
-	__import_name__("System_SetState")
-	));
-
-bool Input_GetKeyState(int key) __attribute__((
-	__import_module__("hge"),
-	__import_name__("Input_GetKeyState")
-	));
+[[clang::import_module("hge"), clang::import_name("Input_GetKeyState")]]
+bool hge_input_get_key_state(int key);
 
 /*
 ** HGE Virtual-key codes
