@@ -56,7 +56,21 @@ bool FrameFunc()
 
 bool RenderFunc()
 {
-	return false;
+	wasm_val_t results[1] = { {.kind = WASM_I32, .of = {.i32 = 0}} };
+
+	if (wasm_runtime_call_wasm_a(main_exec_env, func_render, 1, results, 0, nullptr))
+	{
+		int ret_val;
+		ret_val = results[0].of.i32;
+		return ret_val;
+	}
+	else
+	{
+		const char* exception;
+		if ((exception = wasm_runtime_get_exception(main_module_inst)))
+			std::printf("%s\n", exception);
+		return true;
+	}
 }
 
 void exec_main_module(wasm_module_t main_module, HGE* hge)
