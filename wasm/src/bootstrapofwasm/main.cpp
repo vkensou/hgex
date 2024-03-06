@@ -35,11 +35,11 @@ wasm_exec_env_t main_exec_env = NULL;
 wasm_function_inst_t func_frame = NULL;
 wasm_function_inst_t func_render = NULL;
 
-bool FrameFunc()
+bool exec_func_return_bool(wasm_module_inst_t module_inst, wasm_exec_env_t exec_env, wasm_function_inst_t func)
 {
 	wasm_val_t results[1] = { {.kind = WASM_I32, .of = {.i32 = 0}} };
 
-	if (wasm_runtime_call_wasm_a(main_exec_env, func_frame, 1, results, 0, nullptr))
+	if (wasm_runtime_call_wasm_a(exec_env, func, 1, results, 0, nullptr))
 	{
 		int ret_val;
 		ret_val = results[0].of.i32;
@@ -48,29 +48,44 @@ bool FrameFunc()
 	else
 	{
 		const char* exception;
-		if ((exception = wasm_runtime_get_exception(main_module_inst)))
+		if ((exception = wasm_runtime_get_exception(module_inst)))
 			std::printf("%s\n", exception);
 		return true;
 	}
 }
 
-bool RenderFunc()
+void exec_func(wasm_module_inst_t module_inst, wasm_exec_env_t exec_env, wasm_function_inst_t func)
 {
-	wasm_val_t results[1] = { {.kind = WASM_I32, .of = {.i32 = 0}} };
-
-	if (wasm_runtime_call_wasm_a(main_exec_env, func_render, 1, results, 0, nullptr))
-	{
-		int ret_val;
-		ret_val = results[0].of.i32;
-		return ret_val;
-	}
-	else
+	if (!wasm_runtime_call_wasm_a(exec_env, func, 0, nullptr, 0, nullptr))
 	{
 		const char* exception;
-		if ((exception = wasm_runtime_get_exception(main_module_inst)))
+		if ((exception = wasm_runtime_get_exception(module_inst)))
 			std::printf("%s\n", exception);
-		return true;
 	}
+}
+
+bool try_exec_func_return_bool(wasm_module_inst_t module_inst, wasm_exec_env_t exec_env, wasm_function_inst_t func)
+{
+	if (func)
+		return exec_func_return_bool(module_inst, exec_env, func);
+	else
+		return false;
+}
+
+void try_exec_func(wasm_module_inst_t module_inst, wasm_exec_env_t exec_env, wasm_function_inst_t func)
+{
+	if (func)
+		return exec_func(module_inst, exec_env, func);
+}
+
+bool FrameFunc()
+{
+	return exec_func_return_bool(main_module_inst, main_exec_env, func_frame);
+}
+
+bool RenderFunc()
+{
+	return exec_func_return_bool(main_module_inst, main_exec_env, func_render);
 }
 
 void exec_main_module(wasm_module_t main_module, HGE* hge)
@@ -123,12 +138,7 @@ void exec_main_module(wasm_module_t main_module, HGE* hge)
 		hge->System_SetState(HGE_TITLE, "HGE Wasm App");
 		hge->System_SetState(HGE_WINDOWED, true);
 
-		if (func_config && !wasm_runtime_call_wasm_a(main_exec_env, func_config, 0, nullptr, 0, nullptr))
-		{
-			const char* exception;
-			if ((exception = wasm_runtime_get_exception(main_module_inst)))
-				std::printf("%s\n", exception);
-		}
+		try_exec_func(main_module_inst, main_exec_env, func_config);
 
 		hge->System_SetState(HGE_FRAMEFUNC, FrameFunc);
 		if (func_render)
@@ -136,22 +146,12 @@ void exec_main_module(wasm_module_t main_module, HGE* hge)
 
 		if (hge->System_Initiate())
 		{
-			if (func_init && !wasm_runtime_call_wasm_a(main_exec_env, func_init, 0, nullptr, 0, nullptr))
-			{
-				const char* exception;
-				if ((exception = wasm_runtime_get_exception(main_module_inst)))
-					std::printf("%s\n", exception);
-			}
+			try_exec_func(main_module_inst, main_exec_env, func_init);
 
 			hge->System_Start();
 		}
 
-		if (func_exit && !wasm_runtime_call_wasm_a(main_exec_env, func_exit, 0, nullptr, 0, nullptr))
-		{
-			const char* exception;
-			if ((exception = wasm_runtime_get_exception(main_module_inst)))
-				std::printf("%s\n", exception);
-		}
+		try_exec_func(main_module_inst, main_exec_env, func_exit);
 	}
 
 	if (main_exec_env)
