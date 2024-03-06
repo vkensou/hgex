@@ -1,7 +1,7 @@
 #include "hge.h"
 
-[[clang::export_name("_app_init")]]
-void init()
+[[clang::export_name("_app_config")]]
+void config()
 {
     hge_system_set_state(HGE_TITLE, "HGE WASM Tutorial 01 - Minimal HGE application");
 }
