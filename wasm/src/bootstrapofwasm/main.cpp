@@ -30,14 +30,10 @@ std::tuple<wasm_module_t, uint8_t*> wasm_load_module_from_file(std::filesystem::
 	return std::make_tuple(module, data);
 }
 
-wasm_module_t main_module = NULL;
 wasm_module_inst_t main_module_inst = NULL;
 wasm_exec_env_t main_exec_env = NULL;
-wasm_function_inst_t func_config = NULL;
-wasm_function_inst_t func_init = NULL;
 wasm_function_inst_t func_frame = NULL;
 wasm_function_inst_t func_render = NULL;
-wasm_function_inst_t func_exit = NULL;
 
 bool FrameFunc()
 {
@@ -63,7 +59,7 @@ bool RenderFunc()
 	return false;
 }
 
-void exec_main_module()
+void exec_main_module(wasm_module_t main_module, HGE* hge)
 {
 	char error_buf[128];
 	size_t stack_size = 8092, heap_size = 8092;
@@ -83,6 +79,10 @@ void exec_main_module()
 			printf("Create wasm execution environment failed.\n");
 		}
 	}
+
+	wasm_function_inst_t func_config = NULL;
+	wasm_function_inst_t func_init = NULL;
+	wasm_function_inst_t func_exit = NULL;
 
 	if (main_exec_env)
 	{
@@ -160,7 +160,7 @@ int main(int argc, char *argv[])
 	if (argc > 1)
 		path = argv[1];
 
-	hge = hgeCreate(HGE_VERSION);
+	auto hge = hgeCreate(HGE_VERSION);
 
 	RuntimeInitArgs init_args;
 	memset(&init_args, 0, sizeof(RuntimeInitArgs));
@@ -175,17 +175,15 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	wasm_register_hge_apis();
+	wasm_register_hge_apis(hge);
 
 	auto [main_module, main_module_data] = wasm_load_module_from_file(path);
 	if (main_module)
 	{
-		::main_module = main_module;
-		exec_main_module();
+		exec_main_module(main_module, hge);
 
 		wasm_runtime_unload(main_module);
 		free(main_module_data);
-		::main_module = NULL;
 	}
 
 	wasm_runtime_destroy();
