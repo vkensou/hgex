@@ -21,7 +21,7 @@ void config()
 
 
 [[clang::export_name("_app_init")]]
-void init()
+bool init()
 {
     quad.tex=hge_texture_load("particles.png");
     quad.blend = BLEND_ALPHAADD | BLEND_COLORMUL | BLEND_ZWRITE;
@@ -41,6 +41,16 @@ void init()
     quad.v[1].tx = 128.0 / 128.0; quad.v[1].ty = 64.0 / 128.0;
     quad.v[2].tx = 128.0 / 128.0; quad.v[2].ty = 96.0 / 128.0;
     quad.v[3].tx = 96.0 / 128.0; quad.v[3].ty = 96.0 / 128.0;
+
+	if(!quad.tex)
+	{
+		// If one of the data files is not found, display
+		// an error message and shutdown.
+		// MessageBox(NULL, "Can't load MENU.WAV or PARTICLES.PNG", "Error", MB_OK | MB_ICONERROR | MB_APPLMODAL);
+		return true;
+	}
+
+    return false;
 }
 
 // This function plays collision sound with

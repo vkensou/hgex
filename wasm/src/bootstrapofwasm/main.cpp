@@ -146,9 +146,8 @@ void exec_main_module(wasm_module_t main_module, HGE* hge)
 
 		if (hge->System_Initiate())
 		{
-			try_exec_func(main_module_inst, main_exec_env, func_init);
-
-			hge->System_Start();
+			if (!try_exec_func_return_bool(main_module_inst, main_exec_env, func_init))
+				hge->System_Start();
 		}
 
 		try_exec_func(main_module_inst, main_exec_env, func_exit);
