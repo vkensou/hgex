@@ -1,5 +1,15 @@
 #pragma once
 
+#include <stdint.h>
+
+typedef uint64_t HRESOURCE;
+typedef uint64_t HTEXTURE;
+typedef uint64_t HTARGET;
+typedef uint64_t HEFFECT;
+typedef uint64_t HMUSIC;
+typedef uint64_t HSTREAM;
+typedef uint64_t HCHANNEL;
+
 enum hgeStringState
 {
 	HGE_ICON = 26,   // char*	icon resource		(default: NULL)
@@ -11,11 +21,46 @@ enum hgeStringState
 	HGESTRINGSTATE_FORCE_DWORD = 0x7FFFFFFF
 };
 
+struct hgeVertex
+{
+	float			x, y;		// screen position    
+	float			z;			// Z-buffer depth 0..1
+	uint32_t			col;		// color
+	float			tx, ty;		// texture coordinates
+};
+
+
+/*
+** HGE Triple structure
+*/
+struct hgeTriple
+{
+	hgeVertex		v[3];
+	HTEXTURE		tex;
+	int				blend;
+};
+
+
+/*
+** HGE Quad structure
+*/
+struct hgeQuad
+{
+	hgeVertex		v[4];
+	HTEXTURE		tex;
+	int				blend;
+};
+
 [[clang::import_module("hge"), clang::import_name("System_SetState")]]
 void hge_system_set_state(hgeStringState state, const char* value);
 
 [[clang::import_module("hge"), clang::import_name("Input_GetKeyState")]]
 bool hge_input_get_key_state(int key);
+
+[[clang::import_module("hge"), clang::import_name("Texture_Load")]]
+HTEXTURE hge_texture_load(const char *filename, uint32_t size=0, bool bMipmap=false);
+[[clang::import_module("hge"), clang::import_name("Texture_Free")]]
+void hge_texture_free(HTEXTURE tex);
 
 /*
 ** HGE Virtual-key codes
