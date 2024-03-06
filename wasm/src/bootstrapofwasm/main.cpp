@@ -33,6 +33,7 @@ std::tuple<wasm_module_t, uint8_t*> wasm_load_module_from_file(std::filesystem::
 wasm_module_t main_module = NULL;
 wasm_module_inst_t main_module_inst = NULL;
 wasm_exec_env_t main_exec_env = NULL;
+wasm_function_inst_t func_config = NULL;
 wasm_function_inst_t func_init = NULL;
 wasm_function_inst_t func_frame = NULL;
 wasm_function_inst_t func_render = NULL;
@@ -62,11 +63,6 @@ bool RenderFunc()
 	return false;
 }
 
-bool ExitFunc()
-{
-	return false;
-}
-
 void exec_main_module()
 {
 	char error_buf[128];
@@ -90,32 +86,30 @@ void exec_main_module()
 
 	if (main_exec_env)
 	{
+		auto func_config_name = "_app_config";
 		auto func_init_name = "_app_init";
 		auto func_frame_name = "_app_frame";
 		auto func_render_name = "_app_render";
 		auto func_exit_name = "_app_exit";
 
+		func_config = wasm_runtime_lookup_function(main_module_inst, func_config_name, NULL);
 		func_init = wasm_runtime_lookup_function(main_module_inst, func_init_name, NULL);
 		func_frame = wasm_runtime_lookup_function(main_module_inst, func_frame_name, NULL);
 		func_render = wasm_runtime_lookup_function(main_module_inst, func_render_name, NULL);
 		func_exit = wasm_runtime_lookup_function(main_module_inst, func_exit_name, NULL);
 
-		if (!func_init)
-		{
-			std::printf("The %s function is not found.\n", func_init_name);
-		}
 		if (!func_frame)
 		{
 			std::printf("The %s function is not found.\n", func_frame_name);
 		}
 	}
 
-	if (func_init && func_frame)
+	if (func_frame)
 	{
 		hge->System_SetState(HGE_TITLE, "HGE Wasm App");
 		hge->System_SetState(HGE_WINDOWED, true);
 
-		if (!wasm_runtime_call_wasm_a(main_exec_env, func_init, 0, nullptr, 0, nullptr))
+		if (func_config && !wasm_runtime_call_wasm_a(main_exec_env, func_config, 0, nullptr, 0, nullptr))
 		{
 			const char* exception;
 			if ((exception = wasm_runtime_get_exception(main_module_inst)))
@@ -124,12 +118,26 @@ void exec_main_module()
 
 		hge->System_SetState(HGE_FRAMEFUNC, FrameFunc);
 		if (func_render)
-			hge->System_SetState(HGE_FRAMEFUNC, RenderFunc);
-		if (func_exit)
-			hge->System_SetState(HGE_FRAMEFUNC, ExitFunc);
+			hge->System_SetState(HGE_RENDERFUNC, RenderFunc);
 
 		if (hge->System_Initiate())
+		{
+			if (func_init && !wasm_runtime_call_wasm_a(main_exec_env, func_init, 0, nullptr, 0, nullptr))
+			{
+				const char* exception;
+				if ((exception = wasm_runtime_get_exception(main_module_inst)))
+					std::printf("%s\n", exception);
+			}
+
 			hge->System_Start();
+		}
+
+		if (func_exit && !wasm_runtime_call_wasm_a(main_exec_env, func_exit, 0, nullptr, 0, nullptr))
+		{
+			const char* exception;
+			if ((exception = wasm_runtime_get_exception(main_module_inst)))
+				std::printf("%s\n", exception);
+		}
 	}
 
 	if (main_exec_env)
