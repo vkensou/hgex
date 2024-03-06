@@ -2,6 +2,15 @@
 
 #include <stdint.h>
 
+/*
+** Common data types
+*/
+#ifndef DWORD
+typedef unsigned long       DWORD;
+typedef unsigned short      WORD;
+typedef unsigned char       BYTE;
+#endif
+
 typedef uint64_t HRESOURCE;
 typedef uint64_t HTEXTURE;
 typedef uint64_t HTARGET;
@@ -9,6 +18,34 @@ typedef uint64_t HEFFECT;
 typedef uint64_t HMUSIC;
 typedef uint64_t HSTREAM;
 typedef uint64_t HCHANNEL;
+
+/*
+** Hardware color macros
+*/
+#define ARGB(a,r,g,b)	((DWORD(a)<<24) + (DWORD(r)<<0) + (DWORD(g)<<8) + (DWORD(b)<<16))
+#define RGBA(r,g,b,a)	((DWORD(r)<<0) + (DWORD(g)<<8) + (DWORD(b)<<16) + (DWORD(a)<<24))
+#define GETA(col)		((col)>>24)
+#define GETR(col)		(((col)>>0) & 0xFF)
+#define GETG(col)		(((col)>>8) & 0xFF)
+#define GETB(col)		(((col)>>16) & 0xFF)
+#define SETA(col,a)		(((col) & 0x00FFFFFF) + (DWORD(a)<<24))
+#define SETR(col,r)		(((col) & 0xFFFFFF00) + (DWORD(r)<<0))
+#define SETG(col,g)		(((col) & 0xFFFF00FF) + (DWORD(g)<<8))
+#define SETB(col,b)		(((col) & 0xFF00FFFF) + (DWORD(b)<<16))
+
+
+/*
+** HGE Blending constants
+*/
+#define	BLEND_COLORADD		1
+#define	BLEND_COLORMUL		0
+#define	BLEND_ALPHABLEND	2
+#define	BLEND_ALPHAADD		0
+#define	BLEND_ZWRITE		4
+#define	BLEND_NOZWRITE		0
+
+#define BLEND_DEFAULT		(BLEND_COLORMUL | BLEND_ALPHABLEND | BLEND_NOZWRITE)
+#define BLEND_DEFAULT_Z		(BLEND_COLORMUL | BLEND_ALPHABLEND | BLEND_ZWRITE)
 
 enum hgeStringState
 {
@@ -54,8 +91,24 @@ struct hgeQuad
 [[clang::import_module("hge"), clang::import_name("System_SetState")]]
 void hge_system_set_state(hgeStringState state, const char* value);
 
+[[clang::import_module("hge"), clang::import_name("Timer_GetTime")]]
+float hge_timer_get_time();
+[[clang::import_module("hge"), clang::import_name("Timer_GetDelta")]]
+float hge_timer_get_delta();
+[[clang::import_module("hge"), clang::import_name("Timer_GetFPS")]]
+int hge_timer_get_fps();
+
 [[clang::import_module("hge"), clang::import_name("Input_GetKeyState")]]
 bool hge_input_get_key_state(int key);
+
+[[clang::import_module("hge"), clang::import_name("Gfx_BeginScene")]]
+bool hge_gfx_begin_scene(HTARGET target = 0);
+[[clang::import_module("hge"), clang::import_name("Gfx_EndScene")]]
+void hge_gfx_end_scene();
+[[clang::import_module("hge"), clang::import_name("Gfx_Clear")]]
+void hge_gfx_clear(DWORD color);
+[[clang::import_module("hge"), clang::import_name("Gfx_RenderQuad")]]
+void hge_gfx_render_quad(const hgeQuad* quad);
 
 [[clang::import_module("hge"), clang::import_name("Texture_Load")]]
 HTEXTURE hge_texture_load(const char *filename, uint32_t size=0, bool bMipmap=false);
