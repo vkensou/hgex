@@ -900,6 +900,9 @@ void HGE_Impl::_Resize(int width, int height)
 
 void HGE_Impl::_GfxDone()
 {
+	if (!instance)
+		return;
+
 	cgpu_wait_queue_idle(gfx_queue);
 	cgpu_wait_queue_idle(present_queue);
 
