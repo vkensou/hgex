@@ -1,7 +1,12 @@
 #include "hge.h"
 #include "hgesprite.h"
+#include "hgefont.h"
+#include "hgeparticle.h"
 
-hgeSprite			spr;
+hgeSprite           spr;
+hgeSprite           spt;
+hgeFont             fnt;
+hgeParticleSystem   par;
 
 HTEXTURE			tex;
 
@@ -36,6 +41,15 @@ bool init()
     hge_sprite_set_color(spr, ARGB(0xFF,0xFF,0xA0,0x00));
     hge_sprite_set_hotspot(spr, 16, 16);
 
+    fnt=hge_font_new("font1.fnt");
+
+	// Create and set up a particle system
+	spt=hge_sprite_new(tex, 32, 32, 32, 32);
+	//spt->SetBlendMode(BLEND_COLORMUL | BLEND_ALPHAADD | BLEND_NOZWRITE);
+    hge_sprite_set_hotspot(spt, 16, 16);
+	par=hge_particle_system_new("trail.psi",spt);
+    hge_particle_system_fire(par);
+
     return false;
 }
 
@@ -68,6 +82,11 @@ bool frame()
     if (y > 584) { y = 584 - (y - 584); dy = -dy; boom(); }
     if (y < 16) { y = 16 + 16 - y; dy = -dy; boom(); }
 
+    // Update particle system
+    //par->info.nEmission = (int)(dx * dx + dy * dy) * 2;
+    hge_particle_system_move_to(par, x, y);
+    hge_particle_system_update(par, dt);
+
     return false;
 }
 
@@ -76,7 +95,9 @@ bool render()
 {
     hge_gfx_begin_scene();
     hge_gfx_clear(0);
+    hge_particle_system_render(par);
     hge_sprite_render(spr, x, y);
+    hge_font_printf(fnt, 5, 5, HGETEXT_LEFT, "dt:%.3f\nFPS:%d (constant)", hge_timer_get_delta(), hge_timer_get_fps());
     hge_gfx_end_scene();
 
     return false;
@@ -85,6 +106,9 @@ bool render()
 [[clang::export_name("_app_exit")]]
 void exit()
 {
+    hge_particle_system_delete(par);
+    hge_font_delete(fnt);
+    hge_sprite_delete(spt);
     hge_sprite_delete(spr);
     hge_texture_free(tex);
 }
