@@ -3,6 +3,10 @@
 #include "wasm_export.h"
 #include "hge.h"
 #include "hgesprite.h"
+#include "hgefont.h"
+#include "hgeparticle.h"
+
+#include <stdarg.h>
 
 void System_SetState(wasm_exec_env_t exec_env, int state, const char* str)
 {
@@ -95,6 +99,51 @@ void Sprite_SetHotSpot(wasm_exec_env_t exec_env, uint64_t sprite, float x, float
     ((hgeSprite*)sprite)->SetHotSpot(x, y);
 }
 
+uint64_t Font_New(wasm_exec_env_t exec_env, const char *filename, bool bMipmap)
+{
+    return (uint64_t)new hgeFont(filename, bMipmap);
+}
+
+void Font_Delete(wasm_exec_env_t exec_env, uint64_t font)
+{
+    delete (hgeFont*)font;
+}
+
+void Font_Printf(wasm_exec_env_t exec_env, uint64_t font, float x, float y, int align, const char *format, va_list va_args)
+{
+    ((hgeFont*)font)->printf(x, y, align, format, va_args);
+}
+
+uint64_t ParticleSystem_New(wasm_exec_env_t exec_env, const char* filename, uint64_t sprite)
+{
+    return (uint64_t)new hgeParticleSystem(filename, (hgeSprite*)sprite);
+}
+
+void ParticleSystem_Delete(wasm_exec_env_t exec_env, uint64_t particle)
+{
+    delete (hgeParticleSystem*)particle;
+}
+
+void ParticleSystem_Fire(wasm_exec_env_t exec_env, uint64_t particle)
+{
+    ((hgeParticleSystem*)particle)->Fire();
+}
+
+void ParticleSystem_MoveTo(wasm_exec_env_t exec_env, uint64_t particle, float x, float y, bool bMoveParticles)
+{
+    ((hgeParticleSystem*)particle)->MoveTo(x, y, bMoveParticles);
+}
+
+void ParticleSystem_Update(wasm_exec_env_t exec_env, uint64_t particle, float fDeltaTime)
+{
+    ((hgeParticleSystem*)particle)->Update(fDeltaTime);
+}
+
+void ParticleSystem_Render(wasm_exec_env_t exec_env, uint64_t particle)
+{
+    ((hgeParticleSystem*)particle)->Render();
+}
+
 static NativeSymbol hge_symbols[] = {
     { "System_SetState", System_SetState, "(i$)", NULL },
     { "Timer_GetTime", Timer_GetTime, "()f", NULL },
@@ -113,6 +162,17 @@ static NativeSymbol hge_symbols[] = {
     { "Sprite_Render", Sprite_Render, "(Iff)", NULL },
     { "Sprite_SetColor", Sprite_SetColor, "(Iii)", NULL },
     { "Sprite_SetHotSpot", Sprite_SetHotSpot, "(Iff)", NULL },
+
+    { "Font_New", Font_New, "($i)I", NULL },
+    { "Font_Delete", Font_Delete, "(I)", NULL },
+    { "Font_Printf", Font_Printf, "(Iffi$*)", NULL },
+
+    { "ParticleSystem_New", ParticleSystem_New, "($I)I", NULL },
+    { "ParticleSystem_Delete", ParticleSystem_Delete, "(I)", NULL },
+    { "ParticleSystem_Fire", ParticleSystem_Fire, "(I)", NULL },
+    { "ParticleSystem_MoveTo", ParticleSystem_MoveTo, "(Iffi)", NULL },
+    { "ParticleSystem_Update", ParticleSystem_Update, "(If)", NULL },
+    { "ParticleSystem_Render", ParticleSystem_Render, "(I)", NULL },
 };
 
 int wasm_register_hge_apis(HGE* hge)
