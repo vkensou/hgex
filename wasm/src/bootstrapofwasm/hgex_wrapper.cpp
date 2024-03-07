@@ -2,6 +2,7 @@
 
 #include "wasm_export.h"
 #include "hge.h"
+#include "hgesprite.h"
 
 void System_SetState(wasm_exec_env_t exec_env, int state, const char* str)
 {
@@ -69,6 +70,31 @@ void Texture_Free(wasm_exec_env_t exec_env, uint64_t tex)
     hge->Texture_Free(tex);
 }
 
+uint64_t Sprite_New(wasm_exec_env_t exec_env, uint64_t tex, float x, float y, float w, float h)
+{
+    return (uint64_t)new hgeSprite(tex, x, y, w, h);
+}
+
+void Sprite_Delete(wasm_exec_env_t exec_env, uint64_t sprite)
+{
+    delete (hgeSprite*)sprite;
+}
+
+void Sprite_Render(wasm_exec_env_t exec_env, uint64_t sprite, float x, float y)
+{
+    ((hgeSprite*)sprite)->Render(x, y);
+}
+
+void Sprite_SetColor(wasm_exec_env_t exec_env, uint64_t sprite, DWORD col, int i)
+{
+    ((hgeSprite*)sprite)->SetColor(col, i);
+}
+
+void Sprite_SetHotSpot(wasm_exec_env_t exec_env, uint64_t sprite, float x, float y)
+{
+    ((hgeSprite*)sprite)->SetHotSpot(x, y);
+}
+
 static NativeSymbol hge_symbols[] = {
     { "System_SetState", System_SetState, "(i$)", NULL },
     { "Timer_GetTime", Timer_GetTime, "()f", NULL },
@@ -81,6 +107,12 @@ static NativeSymbol hge_symbols[] = {
     { "Gfx_RenderQuad", Gfx_RenderQuad, "(*)", NULL },
     { "Texture_Load", Texture_Load, "($ii)I", NULL },
     { "Texture_Free", Texture_Free, "(I)", NULL },
+
+    { "Sprite_New", Sprite_New, "(Iffff)I", NULL },
+    { "Sprite_Delete", Sprite_Delete, "(I)", NULL },
+    { "Sprite_Render", Sprite_Render, "(Iff)", NULL },
+    { "Sprite_SetColor", Sprite_SetColor, "(Iii)", NULL },
+    { "Sprite_SetHotSpot", Sprite_SetHotSpot, "(Iff)", NULL },
 };
 
 int wasm_register_hge_apis(HGE* hge)
