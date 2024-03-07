@@ -35,7 +35,9 @@ public:
 	~hgeFont();
 
 	void		Render(float x, float y, int align, const char *string);
+	void		printf(float x, float y, int align, const char* format, va_list va_args);
 	void		printf(float x, float y, int align, const char *format, ...);
+	void		printfb(float x, float y, float w, float h, int align, const char* format, va_list va_args);
 	void		printfb(float x, float y, float w, float h, int align, const char *format, ...);
 
 	void		SetColor(DWORD col);

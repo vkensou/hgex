@@ -182,27 +182,30 @@ void hgeFont::Render(float x, float y, int align, const char *string)
 	hge->Gfx_FinishBatch(bi);
 }
 
-void hgeFont::printf(float x, float y, int align, const char *format, ...)
+void hgeFont::printf(float x, float y, int align, const char *format, va_list va_args)
 {
-	char	*pArg=(char *) &format+sizeof(format);
-
-	_vsnprintf(buffer, sizeof(buffer)-1, format, pArg);
+	_vsnprintf(buffer, sizeof(buffer)-1, format, va_args);
 	buffer[sizeof(buffer)-1]=0;
-	//vsprintf(buffer, format, pArg);
 
 	Render(x,y,align,buffer);
 }
 
-void hgeFont::printfb(float x, float y, float w, float h, int align, const char *format, ...)
+void hgeFont::printf(float x, float y, int align, const char *format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	printf(x, y, align, format, args);
+	va_end(args);
+}
+
+void hgeFont::printfb(float x, float y, float w, float h, int align, const char *format, va_list va_args)
 {
 	char	chr, *pbuf, *prevword, *linestart;
 	int		i,lines=0;
 	float	tx, ty, hh, ww;
-	char	*pArg=(char *) &format+sizeof(format);
 
-	_vsnprintf(buffer, sizeof(buffer)-1, format, pArg);
+	_vsnprintf(buffer, sizeof(buffer)-1, format, va_args);
 	buffer[sizeof(buffer)-1]=0;
-	//vsprintf(buffer, format, pArg);
 
 	linestart=buffer;
 	pbuf=buffer;
@@ -268,6 +271,14 @@ void hgeFont::printfb(float x, float y, float w, float h, int align, const char 
 	}
 
 	Render(tx,ty,align,buffer);
+}
+
+void hgeFont::printfb(float x, float y, float w, float h, int align, const char* format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	printfb(x, y, w, h, align, format, args);
+	va_end(args);
 }
 
 float hgeFont::GetStringWidth(const char *string, bool bMultiline) const
