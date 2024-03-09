@@ -123,8 +123,8 @@ struct DescriptorSetKeyHash
 
 void DInit();
 void DDone();
-bool DFrame();
-bool DRender();
+bool DFrame(void* userdata);
+bool DRender(void* userdata);
 
 
 /*
@@ -267,12 +267,12 @@ public:
 
 
 	// System States
-	bool				(*procFrameFunc)();
-	bool				(*procRenderFunc)();
-	bool				(*procFocusLostFunc)();
-	bool				(*procFocusGainFunc)();
-	bool				(*procGfxRestoreFunc)();
-	bool				(*procExitFunc)();
+	hgeCallback			procFrameFunc;
+	hgeCallback			procRenderFunc;
+	hgeCallback			procFocusLostFunc;
+	hgeCallback			procFocusGainFunc;
+	hgeCallback			procGfxRestoreFunc;
+	hgeCallback			procExitFunc;
 	const char*			szIcon;
 	char				szWinTitle[256];
 	int					nScreenWidth;

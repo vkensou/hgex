@@ -30,10 +30,12 @@ std::tuple<wasm_module_t, uint8_t*> wasm_load_module_from_file(std::filesystem::
 	return std::make_tuple(module, data);
 }
 
-wasm_module_inst_t main_module_inst = NULL;
-wasm_exec_env_t main_exec_env = NULL;
-wasm_function_inst_t func_frame = NULL;
-wasm_function_inst_t func_render = NULL;
+struct HgeWasmFuncEnv
+{
+	wasm_module_inst_t module_inst = NULL;
+	wasm_exec_env_t exec_env = NULL;
+	wasm_function_inst_t func = NULL;
+};
 
 bool exec_func_return_bool(wasm_module_inst_t module_inst, wasm_exec_env_t exec_env, wasm_function_inst_t func)
 {
@@ -78,14 +80,16 @@ void try_exec_func(wasm_module_inst_t module_inst, wasm_exec_env_t exec_env, was
 		return exec_func(module_inst, exec_env, func);
 }
 
-bool FrameFunc()
+bool FrameFunc(void* userdata)
 {
-	return exec_func_return_bool(main_module_inst, main_exec_env, func_frame);
+	auto env = (HgeWasmFuncEnv*)userdata;
+	return exec_func_return_bool(env->module_inst, env->exec_env, env->func);
 }
 
-bool RenderFunc()
+bool RenderFunc(void* userdata)
 {
-	return exec_func_return_bool(main_module_inst, main_exec_env, func_render);
+	auto env = (HgeWasmFuncEnv*)userdata;
+	return exec_func_return_bool(env->module_inst, env->exec_env, env->func);
 }
 
 void exec_main_module(wasm_module_t main_module, HGE* hge)
@@ -94,12 +98,13 @@ void exec_main_module(wasm_module_t main_module, HGE* hge)
 	size_t stack_size = 8092, heap_size = 8092;
 	static char global_heap_buf[512 * 1024];
 
-	main_module_inst = wasm_runtime_instantiate(main_module, stack_size, heap_size, error_buf, sizeof(error_buf));
+	auto main_module_inst = wasm_runtime_instantiate(main_module, stack_size, heap_size, error_buf, sizeof(error_buf));
 	if (!main_module_inst)
 	{
 		std::printf(error_buf);
 	}
 
+	wasm_exec_env_t main_exec_env = NULL;
 	if (main_module_inst)
 	{
 		main_exec_env = wasm_runtime_create_exec_env(main_module_inst, stack_size);
@@ -111,6 +116,8 @@ void exec_main_module(wasm_module_t main_module, HGE* hge)
 
 	wasm_function_inst_t func_config = NULL;
 	wasm_function_inst_t func_init = NULL;
+	wasm_function_inst_t func_frame = NULL;
+	wasm_function_inst_t func_render = NULL;
 	wasm_function_inst_t func_exit = NULL;
 
 	if (main_exec_env)
@@ -140,9 +147,12 @@ void exec_main_module(wasm_module_t main_module, HGE* hge)
 
 		try_exec_func(main_module_inst, main_exec_env, func_config);
 
-		hge->System_SetState(HGE_FRAMEFUNC, FrameFunc);
+		HgeWasmFuncEnv frameFuncEnv = { .module_inst = main_module_inst, .exec_env = main_exec_env, .func = func_frame };
+		HgeWasmFuncEnv renderFuncEnv = { .module_inst = main_module_inst, .exec_env = main_exec_env, .func = func_render };
+
+		hge->System_SetState(HGE_FRAMEFUNC, hgeCallback(FrameFunc, &frameFuncEnv));
 		if (func_render)
-			hge->System_SetState(HGE_RENDERFUNC, RenderFunc);
+			hge->System_SetState(HGE_RENDERFUNC, hgeCallback(RenderFunc, &renderFuncEnv));
 
 		if (hge->System_Initiate())
 		{

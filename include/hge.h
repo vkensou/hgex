@@ -175,8 +175,30 @@ enum hgeStringState
 /*
 ** Callback protoype used by HGE
 */
-typedef bool (*hgeCallback)();
+struct hgeCallback
+{
+	typedef bool (*Callback)(void* userdata);
+	Callback callback = nullptr;
+	void* userdata = nullptr;
 
+	hgeCallback() = default;
+	hgeCallback(Callback callback, void* userdata)
+		: callback(callback), userdata(userdata)
+	{
+	}
+	hgeCallback(Callback callback)
+		: callback(callback), userdata(nullptr)
+	{
+	}
+	operator bool() const
+	{
+		return callback;
+	}
+	bool operator()() const
+	{
+		return callback(userdata);
+	}
+};
 
 /*
 ** HGE_FPS system state special constants

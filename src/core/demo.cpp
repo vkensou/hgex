@@ -188,7 +188,7 @@ void DDone() {
 	pHGE->Texture_Free(dquad.tex);
 }
 
-bool DFrame() {
+bool DFrame(void* userdata) {
 	BYTE alpha;
 	DWORD col;
 
@@ -209,7 +209,7 @@ bool DFrame() {
 	return false;
 }
 
-bool DRender() {
+bool DRender(void* userdata) {
 	pHGE->Gfx_BeginScene();
 	pHGE->Gfx_Clear(0);
 	pHGE->Gfx_RenderQuad(&dquad);
