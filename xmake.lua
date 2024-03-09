@@ -1,19 +1,8 @@
+add_repositories("hge-xrepo xrepo", {rootdir = os.scriptdir()})
+
 add_rules("mode.debug", "mode.release", "mode.releasedbg")
 set_exceptions("cxx")
 set_languages("cxx20")
-
-package("cgpu")
-    add_urls("https://github.com/vkensou/cgpu.git")
-    add_versions("latest", "develop")
-
-    add_deps("spirv-reflect")
-
-    on_install(function(package)
-        import("package.tools.xmake").install(package, {}, {target="cgpu"})
-    end)
-package_end()
-
-includes("wamr.lua")
 
 add_requires("minizip", "libpng")
 add_requires("cgpu")
