@@ -36,7 +36,7 @@ void			CreateGUI();
 HTEXTURE		FontGenerate();
 
 
-bool FrameFunc()
+bool FrameFunc(void* userdata)
 {
 	float		dt=hge->Timer_GetDelta();
 
@@ -62,7 +62,7 @@ bool FrameFunc()
 	return false;
 }
 
-bool RenderFunc()
+bool RenderFunc(void* userdata)
 {
 	int i;
 	char		szTemp[128];
