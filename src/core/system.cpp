@@ -172,15 +172,15 @@ bool CALL HGE_Impl::System_Initiate()
 
 #ifdef DEMO
 
-	bool			(*func)();
-	bool			(*rfunc)();
+	hgeCallback		func;
+	hgeCallback		rfunc;
 	HWND			hwndTmp;
 
 	if(pHGE->bDMO)
 	{
 		Sleep(200);
-		func=(bool(*)())pHGE->System_GetStateFunc(HGE_FRAMEFUNC);
-		rfunc=(bool(*)())pHGE->System_GetStateFunc(HGE_RENDERFUNC);
+		func=pHGE->System_GetStateFunc(HGE_FRAMEFUNC);
+		rfunc=pHGE->System_GetStateFunc(HGE_RENDERFUNC);
 		hwndTmp=hwndParent; hwndParent=0;
 		pHGE->System_SetStateFunc(HGE_FRAMEFUNC, DFrame);
 		pHGE->System_SetStateFunc(HGE_RENDERFUNC, DRender);
@@ -702,7 +702,7 @@ HGE_Impl::HGE_Impl()
 		strcat(szCurPath, "/");
 }
 
-void HGE_Impl::_PostError(char *error)
+void HGE_Impl::_PostError(const char *error)
 {
 	System_Log(error);
 	strcpy(szError,error);

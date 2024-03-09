@@ -9,6 +9,16 @@
 
 #include "fontlist.h"
 
+int CALLBACK EnumFontFamExProc(
+	ENUMLOGFONTEX* lpelfe,    // logical-font data
+	NEWTEXTMETRICEX* lpntme,  // physical-font data
+	DWORD FontType,           // type of font
+	LPARAM lParam             // application-defined data
+)
+{
+	((CFontList*)lParam)->FindSortAdd(lpelfe->elfLogFont.lfFaceName);
+	return 1;
+}
 
 CFontList::CFontList()
 {
@@ -88,16 +98,5 @@ void CFontList::FindSortAdd(char *family)
 	if(pPrev) pPrev->next=pNew;
 	else pFonts=pNew;
 	nFonts++;
-}
-
-int CALLBACK EnumFontFamExProc(
-  ENUMLOGFONTEX *lpelfe,    // logical-font data
-  NEWTEXTMETRICEX *lpntme,  // physical-font data
-  DWORD FontType,           // type of font
-  LPARAM lParam             // application-defined data
-)
-{
-	((CFontList *)lParam)->FindSortAdd(lpelfe->elfLogFont.lfFaceName);
-	return 1;
 }
 

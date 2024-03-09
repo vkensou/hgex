@@ -41,7 +41,7 @@ void boom() {
 	hge->Effect_PlayEx(snd,100,pan,pitch);
 }
 
-bool FrameFunc()
+bool FrameFunc(void* userdata)
 {
 	// Get the time elapsed since last call of FrameFunc().
 	// This will help us to synchronize on different
@@ -75,7 +75,7 @@ bool FrameFunc()
 // This function will be called by HGE when
 // the application window should be redrawn.
 // Put your rendering code here.
-bool RenderFunc()
+bool RenderFunc(void* userdata)
 {
 	// Begin rendering quads.
 	// This function must be called

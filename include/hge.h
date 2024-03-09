@@ -175,8 +175,30 @@ enum hgeStringState
 /*
 ** Callback protoype used by HGE
 */
-typedef bool (*hgeCallback)();
+struct hgeCallback
+{
+	typedef bool (*Callback)(void* userdata);
+	Callback callback = nullptr;
+	void* userdata = nullptr;
 
+	hgeCallback() = default;
+	hgeCallback(Callback callback, void* userdata)
+		: callback(callback), userdata(userdata)
+	{
+	}
+	hgeCallback(Callback callback)
+		: callback(callback), userdata(nullptr)
+	{
+	}
+	operator bool() const
+	{
+		return callback;
+	}
+	bool operator()() const
+	{
+		return callback(userdata);
+	}
+};
 
 /*
 ** HGE_FPS system state special constants
@@ -381,7 +403,7 @@ public:
 	virtual bool		CALL	Input_KeyDown(int key) = 0;
 	virtual bool		CALL	Input_KeyUp(int key) = 0;
 	virtual bool		CALL	Input_GetKeyState(int key) = 0;
-	virtual char*		CALL	Input_GetKeyName(int key) = 0;
+	virtual const char*	CALL	Input_GetKeyName(int key) = 0;
 	virtual int			CALL	Input_GetKey() = 0;
 	virtual int			CALL	Input_GetChar() = 0;
 	virtual bool		CALL	Input_GetEvent(hgeInputEvent *event) = 0;

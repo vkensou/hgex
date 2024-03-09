@@ -14,7 +14,7 @@ HGE *hge = 0;
 // This function will be called by HGE once per frame.
 // Put your game loop code here. In this example we
 // just check whether ESC key has been pressed.
-bool FrameFunc()
+bool FrameFunc(void* userdata)
 {
 	// By returning "true" we tell HGE
 	// to stop running the application.

@@ -51,14 +51,14 @@ void boom() {
 // render targets were lost and have been just created
 // again. We use it here to update the render
 // target's texture handle that changes during recreation.
-bool GfxRestoreFunc()
+bool GfxRestoreFunc(void* userdata)
 {
 	if(tar && target) tar->SetTexture(hge->Target_GetTexture(target));
 	return false;
 }
 
 
-bool FrameFunc()
+bool FrameFunc(void* userdata)
 {
 	float dt=hge->Timer_GetDelta();
 
@@ -85,7 +85,7 @@ bool FrameFunc()
 }
 
 
-bool RenderFunc()
+bool RenderFunc(void* userdata)
 {
 	int i;
 
