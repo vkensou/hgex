@@ -3,6 +3,9 @@ add_repositories("hge-xrepo xrepo", {rootdir = os.scriptdir()})
 add_rules("mode.debug", "mode.release", "mode.releasedbg")
 set_exceptions("cxx")
 set_languages("cxx20")
+if (is_os("windows")) then
+    add_defines("NOMINMAX")
+end
 
 add_requires("minizip", "libpng")
 add_requires("cgpu")
