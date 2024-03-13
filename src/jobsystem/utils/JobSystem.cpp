@@ -39,7 +39,6 @@ static constexpr bool DEBUG_FINISH_HANGS = false;
 #include <math.h>
 
 #if defined(_WIN32)
-#    define NOMINMAX
 #    include <windows.h>
 #    include <string>
 # else
@@ -222,7 +221,7 @@ void JobSystem::decRef(Job const* job) noexcept {
 
 void JobSystem::requestExit() noexcept {
     mExitRequested.store(true);
-    std::lock_guard<Mutex> lock(mWaiterLock);
+    std::lock_guard<std::mutex> lock(mWaiterLock);
     mWaiterCondition.notify_all();
 }
 
@@ -239,7 +238,7 @@ inline bool JobSystem::hasJobCompleted(JobSystem::Job const* job) noexcept {
     return job->runningJobCount.load(std::memory_order_acquire) <= 0;
 }
 
-void JobSystem::wait(std::unique_lock<Mutex>& lock, Job* job) noexcept {
+void JobSystem::wait(std::unique_lock<std::mutex>& lock, Job* job) noexcept {
     if constexpr (!DEBUG_FINISH_HANGS) {
         mWaiterCondition.wait(lock);
     } else {
@@ -278,7 +277,7 @@ void JobSystem::wait(std::unique_lock<Mutex>& lock, Job* job) noexcept {
 
 void JobSystem::wakeAll() noexcept {
     HEAVY_SYSTRACE_CALL();
-    std::lock_guard<Mutex> lock(mWaiterLock);
+    std::lock_guard<std::mutex> lock(mWaiterLock);
     // this empty critical section is needed -- it guarantees that notify_all() happens
     // after the condition's variables are set.
     mWaiterCondition.notify_all();
@@ -286,14 +285,14 @@ void JobSystem::wakeAll() noexcept {
 
 void JobSystem::wakeOne() noexcept {
     HEAVY_SYSTRACE_CALL();
-    std::lock_guard<Mutex> lock(mWaiterLock);
+    std::lock_guard<std::mutex> lock(mWaiterLock);
     // this empty critical section is needed -- it guarantees that notify_one() happens
     // after the condition's variables are set.
     mWaiterCondition.notify_one();
 }
 
 inline JobSystem::ThreadState& JobSystem::getState() noexcept {
-    std::lock_guard<utils::Mutex> lock(mThreadMapLock);
+    std::lock_guard<std::mutex> lock(mThreadMapLock);
     auto iter = mThreadMap.find(std::this_thread::get_id());
     ASSERT_PRECONDITION(iter != mThreadMap.end(), "This thread has not been adopted.");
     return *iter->second;
@@ -436,7 +435,7 @@ void JobSystem::loop(ThreadState* state) noexcept {
     // run our main loop...
     do {
         if (!execute(*state)) {
-            std::unique_lock<Mutex> lock(mWaiterLock);
+            std::unique_lock<std::mutex> lock(mWaiterLock);
             while (!exitRequested() && !hasActiveJobs()) {
                 wait(lock);
                 setThreadAffinityById(state->id);
@@ -563,7 +562,7 @@ void JobSystem::waitAndRelease(Job*& job) noexcept {
             // this could take time however, so we will wait with a condition, and
             // continue to handle more jobs, as they get added.
 
-            std::unique_lock<Mutex> lock(mWaiterLock);
+            std::unique_lock<std::mutex> lock(mWaiterLock);
             if (!hasJobCompleted(job) && !hasActiveJobs() && !exitRequested()) {
                 wait(lock, job);
             }
@@ -585,7 +584,7 @@ void JobSystem::runAndWait(JobSystem::Job*& job) noexcept {
 void JobSystem::adopt() {
     const auto tid = std::this_thread::get_id();
 
-    std::unique_lock<utils::Mutex> lock(mThreadMapLock);
+    std::unique_lock<std::mutex> lock(mThreadMapLock);
     auto iter = mThreadMap.find(tid);
     ThreadState* const state = iter ==  mThreadMap.end() ? nullptr : iter->second;
     lock.unlock();
@@ -618,7 +617,7 @@ void JobSystem::adopt() {
 
 void JobSystem::emancipate() {
     const auto tid = std::this_thread::get_id();
-    std::lock_guard<utils::Mutex> lock(mThreadMapLock);
+    std::lock_guard<std::mutex> lock(mThreadMapLock);
     auto iter = mThreadMap.find(tid);
     ThreadState* const state = iter ==  mThreadMap.end() ? nullptr : iter->second;
     ASSERT_PRECONDITION(state, "this thread is not an adopted thread");

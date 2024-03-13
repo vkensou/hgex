@@ -20,7 +20,6 @@
 #include <utils/compiler.h>
 #include <utils/debug.h>
 #include <utils/memalign.h>
-#include <utils/Mutex.h>
 
 #include <atomic>
 #include <cstddef>
@@ -576,7 +575,7 @@ struct NoLock {
     void unlock() noexcept { }
 };
 
-using Mutex = utils::Mutex;
+using Mutex = std::mutex;
 
 } // namespace LockingPolicy
 

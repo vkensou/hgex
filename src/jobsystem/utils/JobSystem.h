@@ -18,12 +18,8 @@
 #define TNT_UTILS_JOBSYSTEM_H
 
 #include <utils/Allocator.h>
-#include <utils/architecture.h>
 #include <utils/compiler.h>
-#include <utils/Condition.h>
-#include <utils/Log.h>
 #include <utils/memalign.h>
-#include <utils/Mutex.h>
 #include <utils/Slice.h>
 #include <utils/ostream.h>
 #include <utils/WorkStealingDequeue.h>
@@ -42,6 +38,8 @@
 #include <stdint.h>
 
 namespace utils {
+
+constexpr size_t CACHELINE_SIZE = 64;
 
 class JobSystem {
     static constexpr size_t MAX_JOB_COUNT = 16384;
@@ -363,13 +361,13 @@ private:
     Job* pop(WorkQueue& workQueue) noexcept;
     Job* steal(WorkQueue& workQueue) noexcept;
 
-    void wait(std::unique_lock<Mutex>& lock, Job* job = nullptr) noexcept;
+    void wait(std::unique_lock<std::mutex>& lock, Job* job = nullptr) noexcept;
     void wakeAll() noexcept;
     void wakeOne() noexcept;
 
     // these have thread contention, keep them together
-    utils::Mutex mWaiterLock;
-    utils::Condition mWaiterCondition;
+    std::mutex mWaiterLock;
+    std::condition_variable mWaiterCondition;
 
     std::atomic<uint32_t> mActiveJobs = { 0 };
     utils::Arena<utils::ThreadSafeObjectPoolAllocator<Job>, LockingPolicy::NoLock> mJobPool;
@@ -392,7 +390,7 @@ private:
     uint8_t mParallelSplitCount = 0;                    // # of split allowable in parallel_for
     Job* mRootJob = nullptr;
 
-    utils::Mutex mThreadMapLock; // this should have very little contention
+    std::mutex mThreadMapLock; // this should have very little contention
     tsl::robin_map<std::thread::id, ThreadState *> mThreadMap;
 };
 
