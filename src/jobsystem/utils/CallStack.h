@@ -23,7 +23,7 @@
 
 #include <utils/CString.h>
 #include <utils/compiler.h>
-#include <utils/ostream.h>
+#include <ostream>
 
 namespace utils {
 
@@ -84,7 +84,7 @@ public:
      * This will print, when possible, the demangled names of functions corresponding to the
      * program-counter recorded.
      */
-    friend utils::io::ostream& operator <<(utils::io::ostream& stream, const CallStack& callstack);
+    friend std::ostream& operator <<(std::ostream& stream, const CallStack& callstack);
 
     bool operator <(const CallStack& rhs) const;
 

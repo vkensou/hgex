@@ -625,9 +625,9 @@ void JobSystem::emancipate() {
     mThreadMap.erase(iter);
 }
 
-io::ostream& operator<<(io::ostream& out, JobSystem const& js) {
+std::ostream& operator<<(std::ostream& out, JobSystem const& js) {
     for (auto const& item : js.mThreadStates) {
-        out << size_t(item.id) << ": " << item.workQueue.getCount() << io::endl;
+        out << size_t(item.id) << ": " << item.workQueue.getCount() << std::endl;
     }
     return out;
 }

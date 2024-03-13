@@ -18,25 +18,25 @@
 #define TNT_UTILS_LOG_H
 
 #include <utils/compiler.h>
-#include <utils/ostream.h>
+#include <ostream>
 
 namespace utils {
 
 struct UTILS_PUBLIC Loggers {
     // DEBUG level logging stream
-    io::ostream& d;
+    std::ostream& d;
 
     // ERROR level logging stream
-    io::ostream& e;
+    std::ostream& e;
 
     // WARNING level logging stream
-    io::ostream& w;
+    std::ostream& w;
 
     // INFORMATION level logging stream
-    io::ostream& i;
+    std::ostream& i;
 
     // VERBOSE level logging stream
-    io::ostream& v;
+    std::ostream& v;
 };
 
 extern UTILS_PUBLIC Loggers const slog;

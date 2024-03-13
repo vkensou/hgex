@@ -21,7 +21,7 @@
 #include <utils/compiler.h>
 #include <utils/memalign.h>
 #include <utils/Slice.h>
-#include <utils/ostream.h>
+#include <ostream>
 #include <utils/WorkStealingDequeue.h>
 
 #include <tsl/robin_map.h>
@@ -286,7 +286,7 @@ public:
     }
 
     // for debugging
-    friend utils::io::ostream& operator << (utils::io::ostream& out, JobSystem const& js);
+    friend std::ostream& operator << (std::ostream& out, JobSystem const& js);
 
 
     // utility functions...
