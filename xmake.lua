@@ -25,10 +25,16 @@ target("bass")
         end
     end)
 
+target("jobsystem")
+    set_kind("static")
+    add_includedirs("src/jobsystem")
+    add_files("src/jobsystem/utils/*.cpp")
+
 target("hgex")
     set_kind("shared")
 
     add_deps("bass")
+    add_deps("jobsystem")
     add_packages("minizip")
     add_packages("cgpu")
     add_packages("freeimage")
