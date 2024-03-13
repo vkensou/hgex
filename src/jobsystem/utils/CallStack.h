@@ -21,7 +21,7 @@
 #include <stdint.h>
 #include <typeinfo>
 
-#include <utils/CString.h>
+#include <string>
 #include <utils/compiler.h>
 #include <ostream>
 
@@ -68,14 +68,14 @@ public:
     intptr_t operator [](size_t index) const;
 
    /** Demangles a C++ type name */
-    static utils::CString demangleTypeName(const char* mangled);
+    static std::string demangleTypeName(const char* mangled);
 
     template<typename T>
-    static utils::CString typeName() {
+    static std::string typeName() {
 #if UTILS_HAS_RTTI
         return demangleTypeName(typeid(T).name());
 #else
-        return CString("<no-rtti>");
+        return std::string("<no-rtti>");
 #endif
     }
 
@@ -111,7 +111,7 @@ public:
 private:
     void update_gcc(size_t ignore) noexcept;
 
-    static utils::CString demangle(const char* mangled);
+    static std::string demangle(const char* mangled);
 
     static constexpr size_t NUM_FRAMES = 20;
 

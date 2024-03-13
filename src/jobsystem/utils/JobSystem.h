@@ -20,7 +20,6 @@
 #include <utils/Allocator.h>
 #include <utils/compiler.h>
 #include <utils/memalign.h>
-#include <utils/Slice.h>
 #include <ostream>
 #include <utils/WorkStealingDequeue.h>
 
@@ -515,12 +514,12 @@ JobSystem::Job* parallel_for(JobSystem& js, JobSystem::Job* parent,
     return js.createJob<JobData, &JobData::parallelWithJobs>(parent, std::move(jobData));
 }
 
-// parallel jobs on a Slice<>
-template<typename T, typename S, typename F>
-JobSystem::Job* parallel_for(JobSystem& js, JobSystem::Job* parent,
-        utils::Slice<T> slice, F functor, const S& splitter) noexcept {
-    return parallel_for(js, parent, slice.data(), slice.size(), functor, splitter);
-}
+// // parallel jobs on a Slice<>
+// template<typename T, typename S, typename F>
+// JobSystem::Job* parallel_for(JobSystem& js, JobSystem::Job* parent,
+//         utils::Slice<T> slice, F functor, const S& splitter) noexcept {
+//     return parallel_for(js, parent, slice.data(), slice.size(), functor, splitter);
+// }
 
 
 template <size_t COUNT, size_t MAX_SPLITS = 12>
