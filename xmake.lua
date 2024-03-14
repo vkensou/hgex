@@ -27,7 +27,7 @@ target("bass")
 
 target("jobsystem")
     set_kind("static")
-    add_includedirs("src/jobsystem")
+    add_includedirs("src/jobsystem", {public = true})
     add_files("src/jobsystem/utils/*.cpp")
 
 target("hgex")
