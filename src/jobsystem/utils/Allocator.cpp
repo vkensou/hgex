@@ -18,7 +18,7 @@
 
 #include <utils/compiler.h>
 #include <utils/debug.h>
-#include <utils/Log.h>
+#include <iostream>
 
 #include <algorithm>
 
@@ -164,11 +164,11 @@ TrackingPolicy::HighWatermark::~HighWatermark() noexcept {
     if (mSize > 0) {
         size_t wmpct = wm / (mSize / 100);
         if (wmpct > 80) {
-            slog.d << mName << " arena: High watermark "
+            std::cout << mName << " arena: High watermark "
                    << wm / 1024 << " KiB (" << wmpct << "%)" << std::endl;
         }
     } else {
-        slog.d << mName << " arena: High watermark " << wm / 1024 << " KiB" << std::endl;
+        std::cout << mName << " arena: High watermark " << wm / 1024 << " KiB" << std::endl;
     }
 }
 

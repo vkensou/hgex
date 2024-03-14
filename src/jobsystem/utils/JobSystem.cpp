@@ -29,7 +29,6 @@ static constexpr bool DEBUG_FINISH_HANGS = false;
 #include <utils/JobSystem.h>
 
 #include <utils/compiler.h>
-#include <utils/Log.h>
 #include <utils/memalign.h>
 #include <utils/Panic.h>
 #include <utils/Systrace.h>
@@ -119,7 +118,7 @@ void JobSystem::setThreadPriority(Priority priority) noexcept {
     error = setpriority(PRIO_PROCESS, 0, androidPriority);
 #ifndef NDEBUG
     if (UTILS_UNLIKELY(error)) {
-        slog.w << "setpriority failed: " << strerror(errno) << io::endl;
+        std::cout << "setpriority failed: " << strerror(errno) << io::endl;
     }
 #endif
 #endif
