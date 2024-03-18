@@ -133,9 +133,10 @@ void JobSystem::setThreadAffinityById(size_t id) noexcept {
 #endif
 }
 
-JobSystem::JobSystem(const size_t userThreadCount, const size_t adoptableThreadsCount) noexcept
+JobSystem::JobSystem(ThreadCallback thread_start, ThreadCallback thread_end, const size_t userThreadCount, const size_t adoptableThreadsCount) noexcept
     : mJobPool("JobSystem Job pool", MAX_JOB_COUNT * sizeof(Job)),
-      mJobStorageBase(static_cast<Job *>(mJobPool.getAllocator().getCurrent()))
+      mJobStorageBase(static_cast<Job *>(mJobPool.getAllocator().getCurrent())),
+      mTreadStartCallback(thread_start), mTreadEndCallback(thread_end)
 {
     SYSTRACE_ENABLE();
 
@@ -420,6 +421,7 @@ bool JobSystem::execute(JobSystem::ThreadState& state) noexcept {
 void JobSystem::loop(ThreadState* state) noexcept {
     setThreadName("JobSystem::loop");
     setThreadPriority(Priority::DISPLAY);
+    if (mTreadStartCallback)mTreadStartCallback(state->id);
 
     // set a CPU affinity on each of our JobSystem thread to prevent them from jumping from core
     // to core. On Android, it looks like the affinity needs to be reset from time to time.
@@ -441,6 +443,8 @@ void JobSystem::loop(ThreadState* state) noexcept {
             }
         }
     } while (!exitRequested());
+
+    if (mTreadEndCallback)mTreadEndCallback(state->id);
 }
 
 UTILS_NOINLINE

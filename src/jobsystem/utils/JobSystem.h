@@ -49,6 +49,7 @@ public:
     class Job;
 
     using JobFunc = void(*)(void*, JobSystem&, Job*);
+    using ThreadCallback = void(*)(uint32_t thread_id);
 
     class alignas(CACHELINE_SIZE) Job {
     public:
@@ -78,7 +79,7 @@ public:
                                                                 // 64 | 64
     };
 
-    explicit JobSystem(size_t threadCount = 0, size_t adoptableThreadsCount = 1) noexcept;
+    explicit JobSystem(ThreadCallback thread_start, ThreadCallback thread_end, size_t threadCount = 0, size_t adoptableThreadsCount = 1) noexcept;
 
     ~JobSystem();
 
@@ -309,6 +310,8 @@ public:
 
     size_t getThreadCount() const { return mThreadCount; }
 
+    size_t getThreadId() { return getState().id; }
+
 private:
     // this is just to avoid using std::default_random_engine, since we're in a public header.
     class default_random_engine {
@@ -391,6 +394,9 @@ private:
 
     std::mutex mThreadMapLock; // this should have very little contention
     tsl::robin_map<std::thread::id, ThreadState *> mThreadMap;
+
+    ThreadCallback mTreadStartCallback;
+    ThreadCallback mTreadEndCallback;
 };
 
 // -------------------------------------------------------------------------------------------------
