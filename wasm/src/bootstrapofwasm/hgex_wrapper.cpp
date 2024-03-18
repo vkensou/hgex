@@ -7,6 +7,7 @@
 #include "hgeparticle.h"
 
 #include <stdarg.h>
+#include <stdio.h>
 
 void System_SetState(wasm_exec_env_t exec_env, int state, const char* str)
 {
@@ -144,6 +145,12 @@ void ParticleSystem_Render(wasm_exec_env_t exec_env, uint64_t particle)
     ((hgeParticleSystem*)particle)->Render();
 }
 
+void Log_Printf(wasm_exec_env_t exec_env, const char* format, va_list va_args)
+{
+    auto hge = (HGE*)wasm_runtime_get_function_attachment(exec_env);
+    vprintf(format, va_args);
+}
+
 static NativeSymbol hge_symbols[] = {
     { "System_SetState", System_SetState, "(i$)", NULL },
     { "Timer_GetTime", Timer_GetTime, "()f", NULL },
@@ -173,6 +180,8 @@ static NativeSymbol hge_symbols[] = {
     { "ParticleSystem_MoveTo", ParticleSystem_MoveTo, "(Iffi)", NULL },
     { "ParticleSystem_Update", ParticleSystem_Update, "(If)", NULL },
     { "ParticleSystem_Render", ParticleSystem_Render, "(I)", NULL },
+
+    { "Log_Printf", Log_Printf, "($*)", NULL },
 };
 
 int wasm_register_hge_apis(HGE* hge)

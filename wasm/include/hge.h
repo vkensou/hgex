@@ -18,6 +18,9 @@ typedef uint64_t HEFFECT;
 typedef uint64_t HMUSIC;
 typedef uint64_t HSTREAM;
 typedef uint64_t HCHANNEL;
+typedef uint64_t HJOB;
+
+typedef void(*JobCallback)();
 
 /*
 ** Hardware color macros
@@ -114,6 +117,18 @@ void hge_gfx_render_quad(const hgeQuad* quad);
 HTEXTURE hge_texture_load(const char *filename, uint32_t size=0, bool bMipmap=false);
 [[clang::import_module("hge"), clang::import_name("Texture_Free")]]
 void hge_texture_free(HTEXTURE tex);
+
+[[clang::import_module("hge"), clang::import_name("Log_Printf")]]
+void hge_log_printf(const char* format, ...);
+
+[[clang::import_module("hge_js"), clang::import_name("JS_CreateEmptyJob")]]
+HJOB hge_js_create_empty_job(HJOB job = 0);
+[[clang::import_module("hge_js"), clang::import_name("JS_CreateJob")]]
+HJOB hge_js_create_job(HJOB job, JobCallback callback);
+[[clang::import_module("hge_js"), clang::import_name("JS_Run")]]
+void hge_js_run(HJOB job);
+[[clang::import_module("hge_js"), clang::import_name("JS_RunAndWait")]]
+void hge_js_run_and_wait(HJOB job);
 
 /*
 ** HGE Virtual-key codes
