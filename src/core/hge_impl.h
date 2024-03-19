@@ -17,6 +17,7 @@
 #include <unordered_map>
 #include "glm/mat4x4.hpp"
 #include "renderdoc.h"
+#include "utils/JobSystem.h"
 
 #define DEMO
 
@@ -250,6 +251,15 @@ public:
 	virtual DWORD*		CALL	Texture_Lock(HTEXTURE tex, bool bReadOnly=true, int left=0, int top=0, int width=0, int height=0);
 	virtual void		CALL	Texture_Unlock(HTEXTURE tex);
 
+	virtual void		CALL	JS_Start(hgeJobThreadCallback thread_start, hgeJobThreadCallback thread_end);
+	virtual void		CALL	JS_Shutdown();
+	virtual int			CALL	JS_GetWorkerThreadCount();
+	virtual int			CALL	JS_GetThreadId();
+	virtual HJOB		CALL	JS_CreateJob(HJOB parent);
+	virtual HJOB		CALL	JS_CreateJob(hgeJobCallback jobCallback, const hgeJobPayload& payload, HJOB parent);
+	virtual void		CALL	JS_Run(HJOB job);
+	virtual void		CALL	JS_RunAndWait(HJOB job);
+
 	//////// Implementation ////////
 
 	static HGE_Impl*	_Interface_Get();
@@ -425,6 +435,9 @@ public:
 	DWORD				t0, t0fps, dt;
 	int					cfps;
 
+
+	// Job System
+	utils::JobSystem*	pJobSystem;
 
 private:
 	HGE_Impl();

@@ -691,6 +691,8 @@ HGE_Impl::HGE_Impl()
 	hKrnl32 = NULL;
 	lpfnGetSystemPowerStatus = NULL;
 
+	pJobSystem=NULL;
+
 #ifdef DEMO
 	bDMO=true;
 #endif
