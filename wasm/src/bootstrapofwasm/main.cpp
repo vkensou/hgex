@@ -31,6 +31,8 @@ std::tuple<wasm_module_t, uint8_t*> wasm_load_module_from_file(std::filesystem::
 		return std::make_tuple(nullptr, nullptr);
 	}
 
+	wasm_runtime_set_wasi_args_ex(module, NULL, 0, NULL, 0, NULL, 0, NULL, 0, -1, -1, -1);
+
 	return std::make_tuple(module, data);
 }
 

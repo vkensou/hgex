@@ -40,7 +40,9 @@ private:
 [[clang::export_name("_app_config")]]
 void config()
 {
-    hge_log_printf("hello\n");
+    printf("hello wasi\n");
+
+    hge_log_printf("hello hge\n");
 
     hge_system_set_state(HGE_TITLE, "HGE WASM Tutorial 03 - Using helper classes");
 
