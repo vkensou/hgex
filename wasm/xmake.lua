@@ -2,7 +2,6 @@ target("bootstrapofwasm")
     set_kind("binary")
     set_rundir("$(projectdir)/wasm/tutorials/precompiled")
     add_packages("wamr-hge")
-    add_deps("jobsystem")
     add_deps("hgex", "hgexhelpers")
     add_files("src/bootstrapofwasm/*.cpp")
 

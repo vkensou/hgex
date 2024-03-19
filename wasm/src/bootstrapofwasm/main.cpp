@@ -5,7 +5,6 @@
 #include "hge.h"
 #include "hgex_wrapper.h"
 
-#include "utils/JobSystem.h"
 #include <chrono>
 
 std::vector<wasm_exec_env_t> thread_exec_envs;
@@ -111,63 +110,6 @@ void Thread_End(uint32_t id)
 	printf("thread %d end\n", id);
 }
 
-struct HGEJobSystemContext
-{
-	HGE* hge;
-	utils::JobSystem* js;
-};
-
-uint64_t JS_CreateEmptyJob(wasm_exec_env_t exec_env, uint64_t parent)
-{
-	auto context = (HGEJobSystemContext*)wasm_runtime_get_function_attachment(exec_env);
-	return (uint64_t)context->js->createJob((utils::JobSystem::Job*)parent);
-}
-
-uint64_t JS_CreateJob(wasm_exec_env_t exec_env, uint64_t parent, uint32_t element_index)
-{
-	auto context = (HGEJobSystemContext*)wasm_runtime_get_function_attachment(exec_env);
-	return (uint64_t)context->js->createJob((utils::JobSystem::Job*)parent, [element_index](utils::JobSystem& js, utils::JobSystem::Job* job)
-		{
-			auto id = js.getThreadId();
-			auto exec_env = thread_exec_envs[id];
-			wasm_runtime_call_indirect(exec_env, element_index, 0, nullptr);
-		});
-}
-
-void JS_Run(wasm_exec_env_t exec_env, uint64_t job)
-{
-	auto context = (HGEJobSystemContext*)wasm_runtime_get_function_attachment(exec_env);
-	context->js->run((utils::JobSystem::Job*)job);
-}
-
-void JS_RunAndWait(wasm_exec_env_t exec_env, uint64_t job)
-{
-	auto context = (HGEJobSystemContext*)wasm_runtime_get_function_attachment(exec_env);
-	context->js->runAndWait((utils::JobSystem::Job*)job);
-}
-
-static NativeSymbol hge_js_symbols[] = {
-	{ "JS_CreateEmptyJob", JS_CreateEmptyJob, "(I)I", NULL },
-	{ "JS_CreateJob", JS_CreateJob, "(Ii)I", NULL },
-	{ "JS_Run", JS_Run, "(I)", NULL },
-	{ "JS_RunAndWait", JS_RunAndWait, "(I)", NULL },
-};
-
-int wasm_register_hge_js_apis(HGEJobSystemContext* hge_js_context)
-{
-	int n_hge_js_symbols = sizeof(hge_js_symbols) / sizeof(NativeSymbol);
-	for (size_t i = 0; i < n_hge_js_symbols; ++i)
-		hge_js_symbols[i].attachment = hge_js_context;
-	if (!wasm_runtime_register_natives("hge_js",
-		hge_js_symbols,
-		n_hge_js_symbols)) {
-		std::printf("import JobSystem failed");
-		return n_hge_js_symbols;
-	}
-
-	return 0;
-}
-
 class Timer {
 public:
 	Timer() : start_(std::chrono::high_resolution_clock::now()) {}
@@ -186,9 +128,9 @@ private:
 	std::chrono::time_point<std::chrono::high_resolution_clock> start_;
 };
 
-void exec_main_module(wasm_module_t main_module, HGE* hge, utils::JobSystem* jobsystem)
+void exec_main_module(wasm_module_t main_module, HGE* hge)
 {
-	jobsystem->adopt();
+	hge->JS_Start(Thread_Start, Thread_End);
 
 	char error_buf[128];
 	size_t stack_size = 16 * 1024, heap_size = 1024 * 1024;
@@ -240,7 +182,7 @@ void exec_main_module(wasm_module_t main_module, HGE* hge, utils::JobSystem* job
 		hge->System_SetState(HGE_TITLE, "HGE Wasm App");
 		hge->System_SetState(HGE_WINDOWED, true);
 
-		for (size_t i = 0; i < jobsystem->getThreadCount(); ++i)
+		for (size_t i = 0; i < hge->JS_GetWorkerThreadCount(); ++i)
 		{
 			auto newenv = wasm_runtime_spawn_exec_env(main_exec_env);
 			thread_exec_envs.push_back(newenv);
@@ -287,9 +229,7 @@ void exec_main_module(wasm_module_t main_module, HGE* hge, utils::JobSystem* job
 		try_exec_func(main_module_inst, main_exec_env, func_exit);
 	}
 
-	jobsystem->emancipate();
-	delete jobsystem;
-	jobsystem = nullptr;
+	hge->JS_Shutdown();
 
 	thread_exec_envs.pop_back();
 	for (size_t i = 0; i < thread_exec_envs.size(); ++i)
@@ -319,7 +259,6 @@ int main(int argc, char *argv[])
 		path = argv[1];
 
 	auto hge = hgeCreate(HGE_VERSION);
-	auto g_jobSystem = new utils::JobSystem(Thread_Start, Thread_End);
 
 	RuntimeInitArgs init_args;
 	memset(&init_args, 0, sizeof(RuntimeInitArgs));
@@ -335,26 +274,18 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	wasm_register_hge_apis(hge);
-
-	auto hge_js_context = new HGEJobSystemContext();
-	hge_js_context->js = g_jobSystem;
-	hge_js_context->hge = hge;
-	wasm_register_hge_js_apis(hge_js_context);
+	wasm_register_hge_apis(hge, &thread_exec_envs);
 
 	auto [main_module, main_module_data] = wasm_load_module_from_file(path);
 	if (main_module)
 	{
-		exec_main_module(main_module, hge, g_jobSystem);
+		exec_main_module(main_module, hge);
 
 		wasm_runtime_unload(main_module);
 		free(main_module_data);
 	}
 
 	wasm_runtime_destroy();
-
-	delete hge_js_context;
-	g_jobSystem = nullptr;
 
 	hge->System_Shutdown();
 	hge->Release();

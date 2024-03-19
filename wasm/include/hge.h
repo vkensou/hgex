@@ -121,13 +121,13 @@ void hge_texture_free(HTEXTURE tex);
 [[clang::import_module("hge"), clang::import_name("Log_Printf")]]
 void hge_log_printf(const char* format, ...);
 
-[[clang::import_module("hge_js"), clang::import_name("JS_CreateEmptyJob")]]
+[[clang::import_module("hge"), clang::import_name("JS_CreateEmptyJob")]]
 HJOB hge_js_create_empty_job(HJOB job = 0);
-[[clang::import_module("hge_js"), clang::import_name("JS_CreateJob")]]
+[[clang::import_module("hge"), clang::import_name("JS_CreateJob")]]
 HJOB hge_js_create_job(HJOB job, JobCallback callback);
-[[clang::import_module("hge_js"), clang::import_name("JS_Run")]]
+[[clang::import_module("hge"), clang::import_name("JS_Run")]]
 void hge_js_run(HJOB job);
-[[clang::import_module("hge_js"), clang::import_name("JS_RunAndWait")]]
+[[clang::import_module("hge"), clang::import_name("JS_RunAndWait")]]
 void hge_js_run_and_wait(HJOB job);
 
 /*
