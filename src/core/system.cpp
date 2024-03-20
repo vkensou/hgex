@@ -307,12 +307,21 @@ bool CALL HGE_Impl::System_Start()
 				}
 
 				// Do user's stuff
-
-				if(procFrameFunc(this)) break;
+				{
+					utils::JobSystem::Job* root = nullptr;
+					if (pJobSystem) { root = pJobSystem->setRootJob(pJobSystem->createJob()); }
+					if (procFrameFunc(this)) break;
+					if (root) pJobSystem->runAndWait(root);
+				}
 				_CaptureStart();
 				if(_GfxStart())
 				{
-					if(procRenderFunc) procRenderFunc(this);
+					{
+						utils::JobSystem::Job* root = nullptr;
+						if (pJobSystem) { root = pJobSystem->setRootJob(pJobSystem->createJob()); }
+						if (procRenderFunc) procRenderFunc(this);
+						if (root) pJobSystem->runAndWait(root);
+					}
 					_GfxEnd();
 				}
 				_CaptureEnd();
