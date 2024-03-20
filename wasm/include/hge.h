@@ -20,7 +20,25 @@ typedef uint64_t HSTREAM;
 typedef uint64_t HCHANNEL;
 typedef uint64_t HJOB;
 
-typedef void(*JobCallback)();
+struct hgeJobPayload
+{
+	template<class T>
+	hgeJobPayload(const T& t)
+	{
+		static_assert(sizeof(T) <= sizeof(data), "data too large");
+		new (&data) T(t);
+	}
+
+	template<class T>
+	T cast() const
+	{
+		return *(reinterpret_cast<const T*>(data));
+	}
+
+	uint64_t data;
+};
+
+typedef void(*JobCallback)(HJOB, hgeJobPayload);
 
 /*
 ** Hardware color macros
@@ -124,7 +142,11 @@ void hge_log_printf(const char* format, ...);
 [[clang::import_module("hge"), clang::import_name("JS_CreateEmptyJob")]]
 HJOB hge_js_create_empty_job(HJOB job = 0);
 [[clang::import_module("hge"), clang::import_name("JS_CreateJob")]]
-HJOB hge_js_create_job(HJOB job, JobCallback callback);
+HJOB hge_js_create_job(HJOB job, JobCallback callback, uint8_t* payload);
+inline HJOB hge_js_create_job(HJOB job, JobCallback callback, const hgeJobPayload& payload=nullptr)
+{
+	return hge_js_create_job(job, callback, (uint8_t*)& payload.data);
+}
 [[clang::import_module("hge"), clang::import_name("JS_Run")]]
 void hge_js_run(HJOB job);
 [[clang::import_module("hge"), clang::import_name("JS_RunAndWait")]]

@@ -160,16 +160,22 @@ uint64_t JS_CreateEmptyJob(wasm_exec_env_t exec_env, uint64_t parent)
     return (uint64_t)hge->JS_CreateJob((HJOB)parent);
 }
 
-uint64_t JS_CreateJob(wasm_exec_env_t exec_env, uint64_t parent, uint32_t element_index)
+uint64_t JS_CreateJob(wasm_exec_env_t exec_env, uint64_t parent, uint32_t element_index, uint8_t* payload)
 {
+    hgeJobPayload real_payload;
+    (*(uint32_t*)real_payload.data) = element_index;
+    memcpy(real_payload.data + 4, payload, sizeof(uint64_t));
     auto hge = (HGE*)wasm_runtime_get_function_attachment(exec_env);
     return (uint64_t)hge->JS_CreateJob([](HGE* hge, HJOB job, const hgeJobPayload& payload)
         {
             uint32_t element_index = payload.cast<uint32_t>();
             auto id = hge->JS_GetThreadId();
             auto exec_env = thread_exec_envs->at(id);
-            wasm_runtime_call_indirect(exec_env, element_index, 0, nullptr);
-        }, element_index, (HJOB)parent);
+            uint32_t argv[9];
+            *(uint64_t*)argv = job;
+            memcpy(argv + 2, payload.data + 4, sizeof(uint64_t));
+            wasm_runtime_call_indirect(exec_env, element_index, 4, argv);
+        }, real_payload, (HJOB)parent);
 }
 
 void JS_Run(wasm_exec_env_t exec_env, uint64_t job)
@@ -217,7 +223,7 @@ static NativeSymbol hge_symbols[] = {
     { "Log_Printf", Log_Printf, "($*)", NULL },
 
     { "JS_CreateEmptyJob", JS_CreateEmptyJob, "(I)I", NULL },
-    { "JS_CreateJob", JS_CreateJob, "(Ii)I", NULL },
+    { "JS_CreateJob", JS_CreateJob, "(Ii*)I", NULL },
     { "JS_Run", JS_Run, "(I)", NULL },
     { "JS_RunAndWait", JS_RunAndWait, "(I)", NULL },
 };

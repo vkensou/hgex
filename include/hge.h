@@ -203,6 +203,8 @@ struct hgeCallback
 
 struct hgeJobPayload
 {
+	hgeJobPayload() = default;
+
 	template<class T>
 	hgeJobPayload(const T& t)
 	{

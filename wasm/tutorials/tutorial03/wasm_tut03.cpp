@@ -64,18 +64,20 @@ void config()
 
 
         auto job1 = hge_js_create_empty_job(0);
-
-        auto job2 = hge_js_create_job(job1, []()
+        uint64_t data = 0x1145146419198;
+        auto job2 = hge_js_create_job(job1, [](HJOB job, hgeJobPayload payload)
             {
+                printf("job2 payload data %llx\n", payload.data);
                 uint64_t sum = 0;
                 for (size_t i = 0; i < 2500000; ++i)
                 {
                     sum += i;
                 }
-            });
+            }, data);
         hge_js_run(job2);
-        auto job3 = hge_js_create_job(job1, []()
+        auto job3 = hge_js_create_job(job1, [](HJOB job, hgeJobPayload payload)
             {
+                printf("job3 payload data %llx\n", payload.data);
                 uint64_t sum = 0;
                 for (size_t i = 0; i < 2500000; ++i)
                 {
@@ -83,7 +85,7 @@ void config()
                 }
             });
         hge_js_run(job3);
-        auto job4 = hge_js_create_job(job1, []()
+        auto job4 = hge_js_create_job(job1, [](HJOB job, hgeJobPayload payload)
             {
                 uint64_t sum = 0;
                 for (size_t i = 0; i < 2500000; ++i)
@@ -92,7 +94,7 @@ void config()
                 }
             });
         hge_js_run(job4);
-        auto job5 = hge_js_create_job(job1, []()
+        auto job5 = hge_js_create_job(job1, [](auto job, auto payload)
             {
                 uint64_t sum = 0;
                 for (size_t i = 0; i < 2500000; ++i)
