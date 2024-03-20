@@ -49,7 +49,7 @@ void boom() {
 	hge->Effect_PlayEx(snd,100,pan,pitch);
 }
 
-bool FrameFunc(void* userdata)
+bool FrameFunc(HGE* hge, void* userdata)
 {
 	float dt=hge->Timer_GetDelta();
 
@@ -76,7 +76,7 @@ bool FrameFunc(void* userdata)
 }
 
 
-bool RenderFunc(void* userdata)
+bool RenderFunc(HGE* hge, void* userdata)
 {
 	// Render graphics
 	hge->Gfx_BeginScene();

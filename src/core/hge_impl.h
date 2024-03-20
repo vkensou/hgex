@@ -124,8 +124,8 @@ struct DescriptorSetKeyHash
 
 void DInit();
 void DDone();
-bool DFrame(void* userdata);
-bool DRender(void* userdata);
+bool DFrame(HGE* hge, void* userdata);
+bool DRender(HGE* hge, void* userdata);
 
 
 /*

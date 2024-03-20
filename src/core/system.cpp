@@ -308,11 +308,11 @@ bool CALL HGE_Impl::System_Start()
 
 				// Do user's stuff
 
-				if(procFrameFunc()) break;
+				if(procFrameFunc(this)) break;
 				_CaptureStart();
 				if(_GfxStart())
 				{
-					if(procRenderFunc) procRenderFunc();
+					if(procRenderFunc) procRenderFunc(this);
 					_GfxEnd();
 				}
 				_CaptureEnd();
@@ -716,11 +716,11 @@ void HGE_Impl::_FocusChange(bool bAct)
 
 	if(bActive)
 	{
-		if(procFocusGainFunc) procFocusGainFunc();
+		if(procFocusGainFunc) procFocusGainFunc(this);
 	}
 	else
 	{
-		if(procFocusLostFunc) procFocusLostFunc();
+		if(procFocusLostFunc) procFocusLostFunc(this);
 	}
 }
 
@@ -738,7 +738,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 			{
 				if(pHGE->_GfxStart())
 				{
-					pHGE->procRenderFunc();
+					pHGE->procRenderFunc(pHGE);
 					pHGE->_GfxEnd();
 				}
 			}
@@ -770,7 +770,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		case WM_SYSKEYDOWN:
 			if(wparam == VK_F4)
 			{
-				if(pHGE->procExitFunc && !pHGE->procExitFunc()) return FALSE;
+				if(pHGE->procExitFunc && !pHGE->procExitFunc(pHGE)) return FALSE;
 				return DefWindowProc(hwnd, msg, wparam, lparam);
 			}
 			else if(wparam == VK_RETURN)
@@ -842,7 +842,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		case WM_SYSCOMMAND:
 			if(wparam==SC_CLOSE)
 			{
-				if(pHGE->procExitFunc && !pHGE->procExitFunc()) return FALSE;
+				if(pHGE->procExitFunc && !pHGE->procExitFunc(pHGE)) return FALSE;
 				pHGE->bActive=false;
 				return DefWindowProc(hwnd, msg, wparam, lparam);
 			}

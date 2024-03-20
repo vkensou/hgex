@@ -178,7 +178,7 @@ enum hgeStringState
 */
 struct hgeCallback
 {
-	typedef bool (*Callback)(void* userdata);
+	typedef bool (*Callback)(class HGE* hge, void* userdata);
 	Callback callback = nullptr;
 	void* userdata = nullptr;
 
@@ -195,9 +195,9 @@ struct hgeCallback
 	{
 		return callback;
 	}
-	bool operator()() const
+	bool operator()(class HGE* hge) const
 	{
-		return callback(userdata);
+		return callback(hge, userdata);
 	}
 };
 

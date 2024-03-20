@@ -30,7 +30,7 @@ void			DoneEditor();
 void			CreateGUI();
 
 
-bool FrameFunc(void* userdata)
+bool FrameFunc(HGE* hge, void* userdata)
 {
 	float		px, py;
 	float		dt=hge->Timer_GetDelta();
@@ -64,7 +64,7 @@ bool FrameFunc(void* userdata)
 	return false;
 }
 
-bool RenderFunc(void* userdata)
+bool RenderFunc(HGE* hge, void* userdata)
 {
 	hgeRect		bbox;
 

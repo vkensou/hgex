@@ -41,7 +41,7 @@ const float meshx=144;
 const float meshy=44;
 
 
-bool FrameFunc(void* userdata)
+bool FrameFunc(HGE* hge, void* userdata)
 {
 	float dt=hge->Timer_GetDelta();
 	static float t=0.0f;
@@ -101,7 +101,7 @@ bool FrameFunc(void* userdata)
 }
 
 
-bool RenderFunc(void* userdata)
+bool RenderFunc(HGE* hge, void* userdata)
 {
 	// Render graphics
 	hge->Gfx_BeginScene();

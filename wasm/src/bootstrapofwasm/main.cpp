@@ -86,13 +86,13 @@ void try_exec_func(wasm_module_inst_t module_inst, wasm_exec_env_t exec_env, was
 		return exec_func(module_inst, exec_env, func);
 }
 
-bool FrameFunc(void* userdata)
+bool FrameFunc(HGE* hge, void* userdata)
 {
 	auto env = (HgeWasmFuncEnv*)userdata;
 	return exec_func_return_bool(env->module_inst, env->exec_env, env->func);
 }
 
-bool RenderFunc(void* userdata)
+bool RenderFunc(HGE* hge, void* userdata)
 {
 	auto env = (HgeWasmFuncEnv*)userdata;
 	return exec_func_return_bool(env->module_inst, env->exec_env, env->func);

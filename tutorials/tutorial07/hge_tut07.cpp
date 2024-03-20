@@ -81,7 +81,7 @@ void SetBlend(int blend)
 	for(int i=0;i<MAX_OBJECTS;i++) pObjects[i].color=sprColors[blend][hge->Random_Int(0,4)];
 }
 
-bool FrameFunc(void* userdata)
+bool FrameFunc(HGE* hge, void* userdata)
 {
 	float dt=hge->Timer_GetDelta();
 	int i;
@@ -113,7 +113,7 @@ bool FrameFunc(void* userdata)
 }
 
 
-bool RenderFunc(void* userdata)
+bool RenderFunc(HGE* hge, void* userdata)
 {
 	int i;
 	int bi;
