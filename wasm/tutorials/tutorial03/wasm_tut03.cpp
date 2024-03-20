@@ -1,7 +1,8 @@
-#include "hge.h"
+﻿#include "hge.h"
 #include "hgesprite.h"
 #include "hgefont.h"
 #include "hgeparticle.h"
+#include <chrono>
 
 hgeSprite           spr;
 hgeSprite           spt;
@@ -17,12 +18,98 @@ float dx = 0.0f, dy = 0.0f;
 const float speed = 90;
 const float friction = 0.98f;
 
+class Timer {
+public:
+    Timer() : start_(std::chrono::high_resolution_clock::now()) {}
+
+    void reset() {
+        start_ = std::chrono::high_resolution_clock::now();
+    }
+
+    double elapsed() const {
+        auto now = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> diff = now - start_;
+        return diff.count();
+    }
+
+private:
+    std::chrono::time_point<std::chrono::high_resolution_clock> start_;
+};
+
+
 [[clang::export_name("_app_config")]]
 void config()
 {
-    hge_system_set_state(HGE_TITLE, "HGE WASM Tutorial 03 - Using helper classes");
-}
+    printf("hello wasi\n");
 
+    hge_log_printf("hello hge\n");
+
+    hge_system_set_state(HGE_TITLE, "HGE WASM Tutorial 03 - Using helper classes");
+
+    {
+        Timer timer;
+
+        uint64_t sum = 0;
+        for (size_t i = 0; i < 10000000; ++i)
+        {
+            sum += i;
+        }
+
+        double elapsedTime = timer.elapsed();
+        hge_log_printf("wasm 普通循环耗时 %f %lld\n", elapsedTime, sum);
+    }
+
+    {
+        Timer timer;
+
+
+        auto job1 = hge_js_create_empty_job(0);
+        uint64_t data = 0x1145146419198;
+        auto job2 = hge_js_create_job(job1, [](HJOB job, hgeJobPayload payload)
+            {
+                printf("job2 payload data %llx\n", payload.data);
+                uint64_t sum = 0;
+                for (size_t i = 0; i < 2500000; ++i)
+                {
+                    sum += i;
+                }
+            }, data);
+        hge_js_run(job2);
+        auto job3 = hge_js_create_job(job1, [](HJOB job, hgeJobPayload payload)
+            {
+                printf("job3 payload data %llx\n", payload.data);
+                uint64_t sum = 0;
+                for (size_t i = 0; i < 2500000; ++i)
+                {
+                    sum += i;
+                }
+            });
+        hge_js_run(job3);
+        auto job4 = hge_js_create_job(job1, [](HJOB job, hgeJobPayload payload)
+            {
+                uint64_t sum = 0;
+                for (size_t i = 0; i < 2500000; ++i)
+                {
+                    sum += i;
+                }
+            });
+        hge_js_run(job4);
+        auto job5 = hge_js_create_job(job1, [](auto job, auto payload)
+            {
+                uint64_t sum = 0;
+                for (size_t i = 0; i < 2500000; ++i)
+                {
+                    sum += i;
+                }
+            });
+        hge_js_run(job5);
+        hge_js_run_and_wait(job1);
+
+        double elapsedTime = timer.elapsed();
+
+        hge_log_printf("wasm Job循环耗时：%f\n", elapsedTime);
+    }
+}
 
 [[clang::export_name("_app_init")]]
 bool init()

@@ -1,25 +1,17 @@
+add_repositories("hge-xrepo xrepo", {rootdir = os.scriptdir()})
+
 add_rules("mode.debug", "mode.release", "mode.releasedbg")
 set_exceptions("cxx")
-set_languages("cxx20")
-
-package("cgpu")
-    add_urls("https://github.com/vkensou/cgpu.git")
-    add_versions("latest", "develop")
-
-    add_deps("spirv-reflect")
-
-    on_install(function(package)
-        import("package.tools.xmake").install(package, {}, {target="cgpu"})
-    end)
-package_end()
-
-includes("wamr.lua")
+set_languages("c17", "cxx20")
+if (is_os("windows")) then
+    add_defines("NOMINMAX")
+end
 
 add_requires("minizip", "libpng")
 add_requires("cgpu")
 add_requires("freeimage")
 add_requires("glm")
-add_requires("wasm-micro-runtime")
+add_requires("wamr-hge")
 
 target("bass")
     set_kind("headeronly")
@@ -33,10 +25,16 @@ target("bass")
         end
     end)
 
+target("jobsystem")
+    set_kind("static")
+    add_includedirs("src/jobsystem", {public = true})
+    add_files("src/jobsystem/utils/*.cpp")
+
 target("hgex")
     set_kind("shared")
 
     add_deps("bass")
+    add_deps("jobsystem")
     add_packages("minizip")
     add_packages("cgpu")
     add_packages("freeimage")

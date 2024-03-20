@@ -307,12 +307,21 @@ bool CALL HGE_Impl::System_Start()
 				}
 
 				// Do user's stuff
-
-				if(procFrameFunc()) break;
+				{
+					utils::JobSystem::Job* root = nullptr;
+					if (pJobSystem) { root = pJobSystem->setRootJob(pJobSystem->createJob()); }
+					if (procFrameFunc(this)) break;
+					if (root) pJobSystem->runAndWait(root);
+				}
 				_CaptureStart();
 				if(_GfxStart())
 				{
-					if(procRenderFunc) procRenderFunc();
+					{
+						utils::JobSystem::Job* root = nullptr;
+						if (pJobSystem) { root = pJobSystem->setRootJob(pJobSystem->createJob()); }
+						if (procRenderFunc) procRenderFunc(this);
+						if (root) pJobSystem->runAndWait(root);
+					}
 					_GfxEnd();
 				}
 				_CaptureEnd();
@@ -691,6 +700,8 @@ HGE_Impl::HGE_Impl()
 	hKrnl32 = NULL;
 	lpfnGetSystemPowerStatus = NULL;
 
+	pJobSystem=NULL;
+
 #ifdef DEMO
 	bDMO=true;
 #endif
@@ -714,11 +725,11 @@ void HGE_Impl::_FocusChange(bool bAct)
 
 	if(bActive)
 	{
-		if(procFocusGainFunc) procFocusGainFunc();
+		if(procFocusGainFunc) procFocusGainFunc(this);
 	}
 	else
 	{
-		if(procFocusLostFunc) procFocusLostFunc();
+		if(procFocusLostFunc) procFocusLostFunc(this);
 	}
 }
 
@@ -736,7 +747,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 			{
 				if(pHGE->_GfxStart())
 				{
-					pHGE->procRenderFunc();
+					pHGE->procRenderFunc(pHGE);
 					pHGE->_GfxEnd();
 				}
 			}
@@ -768,7 +779,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		case WM_SYSKEYDOWN:
 			if(wparam == VK_F4)
 			{
-				if(pHGE->procExitFunc && !pHGE->procExitFunc()) return FALSE;
+				if(pHGE->procExitFunc && !pHGE->procExitFunc(pHGE)) return FALSE;
 				return DefWindowProc(hwnd, msg, wparam, lparam);
 			}
 			else if(wparam == VK_RETURN)
@@ -840,7 +851,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		case WM_SYSCOMMAND:
 			if(wparam==SC_CLOSE)
 			{
-				if(pHGE->procExitFunc && !pHGE->procExitFunc()) return FALSE;
+				if(pHGE->procExitFunc && !pHGE->procExitFunc(pHGE)) return FALSE;
 				pHGE->bActive=false;
 				return DefWindowProc(hwnd, msg, wparam, lparam);
 			}

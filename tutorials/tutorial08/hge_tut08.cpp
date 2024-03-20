@@ -104,7 +104,7 @@ void RenderSimulation();
 ///////////////////////// Implementation ///////////////////////////
 
 
-bool FrameFunc(void* userdata)
+bool FrameFunc(HGE* hge, void* userdata)
 {
 	// Process keys
 	
@@ -131,7 +131,7 @@ bool FrameFunc(void* userdata)
 }
 
 
-bool RenderFunc(void* userdata)
+bool RenderFunc(HGE* hge, void* userdata)
 {
 	int hrs, mins, secs;
 	float tmp;

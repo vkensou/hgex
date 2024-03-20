@@ -7,6 +7,10 @@
 #include "hgeparticle.h"
 
 #include <stdarg.h>
+#include <stdio.h>
+#include <vector>
+
+std::vector<wasm_exec_env_t>* thread_exec_envs;
 
 void System_SetState(wasm_exec_env_t exec_env, int state, const char* str)
 {
@@ -144,6 +148,48 @@ void ParticleSystem_Render(wasm_exec_env_t exec_env, uint64_t particle)
     ((hgeParticleSystem*)particle)->Render();
 }
 
+void Log_Printf(wasm_exec_env_t exec_env, const char* format, va_list va_args)
+{
+    auto hge = (HGE*)wasm_runtime_get_function_attachment(exec_env);
+    vprintf(format, va_args);
+}
+
+uint64_t JS_CreateEmptyJob(wasm_exec_env_t exec_env, uint64_t parent)
+{
+    auto hge = (HGE*)wasm_runtime_get_function_attachment(exec_env);
+    return (uint64_t)hge->JS_CreateJob((HJOB)parent);
+}
+
+uint64_t JS_CreateJob(wasm_exec_env_t exec_env, uint64_t parent, uint32_t element_index, uint8_t* payload)
+{
+    hgeJobPayload real_payload;
+    (*(uint32_t*)real_payload.data) = element_index;
+    memcpy(real_payload.data + 4, payload, sizeof(uint64_t));
+    auto hge = (HGE*)wasm_runtime_get_function_attachment(exec_env);
+    return (uint64_t)hge->JS_CreateJob([](HGE* hge, HJOB job, const hgeJobPayload& payload)
+        {
+            uint32_t element_index = payload.cast<uint32_t>();
+            auto id = hge->JS_GetThreadId();
+            auto exec_env = thread_exec_envs->at(id);
+            uint32_t argv[9];
+            *(uint64_t*)argv = job;
+            memcpy(argv + 2, payload.data + 4, sizeof(uint64_t));
+            wasm_runtime_call_indirect(exec_env, element_index, 4, argv);
+        }, real_payload, (HJOB)parent);
+}
+
+void JS_Run(wasm_exec_env_t exec_env, uint64_t job)
+{
+    auto hge = (HGE*)wasm_runtime_get_function_attachment(exec_env);
+    hge->JS_Run((HJOB)job);
+}
+
+void JS_RunAndWait(wasm_exec_env_t exec_env, uint64_t job)
+{
+    auto hge = (HGE*)wasm_runtime_get_function_attachment(exec_env);
+    hge->JS_RunAndWait((HJOB)job);
+}
+
 static NativeSymbol hge_symbols[] = {
     { "System_SetState", System_SetState, "(i$)", NULL },
     { "Timer_GetTime", Timer_GetTime, "()f", NULL },
@@ -173,10 +219,18 @@ static NativeSymbol hge_symbols[] = {
     { "ParticleSystem_MoveTo", ParticleSystem_MoveTo, "(Iffi)", NULL },
     { "ParticleSystem_Update", ParticleSystem_Update, "(If)", NULL },
     { "ParticleSystem_Render", ParticleSystem_Render, "(I)", NULL },
+
+    { "Log_Printf", Log_Printf, "($*)", NULL },
+
+    { "JS_CreateEmptyJob", JS_CreateEmptyJob, "(I)I", NULL },
+    { "JS_CreateJob", JS_CreateJob, "(Ii*)I", NULL },
+    { "JS_Run", JS_Run, "(I)", NULL },
+    { "JS_RunAndWait", JS_RunAndWait, "(I)", NULL },
 };
 
-int wasm_register_hge_apis(HGE* hge)
+int wasm_register_hge_apis(HGE* hge, void* thread_exec_envs)
 {
+    ::thread_exec_envs = (std::vector<wasm_exec_env_t>*)thread_exec_envs;
     int n_hge_symbols = sizeof(hge_symbols) / sizeof(NativeSymbol);
     for (size_t i = 0; i < n_hge_symbols; ++i)
         hge_symbols[i].attachment = hge;

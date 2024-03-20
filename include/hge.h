@@ -71,6 +71,7 @@ typedef uintptr_t HEFFECT;
 typedef uintptr_t HMUSIC;
 typedef uintptr_t HSTREAM;
 typedef uintptr_t HCHANNEL;
+typedef uintptr_t HJOB;
 
 
 /*
@@ -177,7 +178,7 @@ enum hgeStringState
 */
 struct hgeCallback
 {
-	typedef bool (*Callback)(void* userdata);
+	typedef bool (*Callback)(class HGE* hge, void* userdata);
 	Callback callback = nullptr;
 	void* userdata = nullptr;
 
@@ -194,11 +195,33 @@ struct hgeCallback
 	{
 		return callback;
 	}
-	bool operator()() const
+	bool operator()(class HGE* hge) const
 	{
-		return callback(userdata);
+		return callback(hge, userdata);
 	}
 };
+
+struct hgeJobPayload
+{
+	hgeJobPayload() = default;
+
+	template<class T>
+	hgeJobPayload(const T& t)
+	{
+		static_assert(sizeof(T) <= sizeof(data), "data too large");
+		new (data) T(t);
+	}
+
+	template<class T>
+	T cast() const
+	{
+		return *(reinterpret_cast<const T*>(data));
+	}
+
+	uint8_t data[32];
+};
+typedef void(*hgeJobCallback)(class HGE*, HJOB, const hgeJobPayload&);
+typedef void(*hgeJobThreadCallback)(uint32_t thread_id);
 
 /*
 ** HGE_FPS system state special constants
@@ -430,6 +453,15 @@ public:
 	virtual int			CALL	Texture_GetHeight(HTEXTURE tex, bool bOriginal=false) = 0;
 	virtual DWORD*		CALL	Texture_Lock(HTEXTURE tex, bool bReadOnly=true, int left=0, int top=0, int width=0, int height=0) = 0;
 	virtual void		CALL	Texture_Unlock(HTEXTURE tex) = 0;
+
+	virtual void		CALL	JS_Start(hgeJobThreadCallback thread_start, hgeJobThreadCallback thread_end) = 0;
+	virtual void		CALL	JS_Shutdown() = 0;
+	virtual int			CALL	JS_GetWorkerThreadCount() = 0;
+	virtual int			CALL	JS_GetThreadId() = 0;
+	virtual HJOB		CALL	JS_CreateJob(HJOB parent=0) = 0;
+	virtual HJOB		CALL	JS_CreateJob(hgeJobCallback jobCallback, const hgeJobPayload& payload, HJOB parent=0) = 0;
+	virtual void		CALL	JS_Run(HJOB job) = 0;
+	virtual void		CALL	JS_RunAndWait(HJOB job) = 0;
 };
 
 extern "C" { EXPORT HGE * CALL hgeCreate(int ver); }
