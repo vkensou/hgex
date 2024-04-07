@@ -310,8 +310,9 @@ bool CALL HGE_Impl::System_Start()
 				{
 					utils::JobSystem::Job* root = nullptr;
 					if (pJobSystem) { root = pJobSystem->setRootJob(pJobSystem->createJob()); }
-					if (procFrameFunc(this)) break;
+					bool frameResult = procFrameFunc(this);
 					if (root) pJobSystem->runAndWait(root);
+					if (frameResult) break;
 				}
 				_CaptureStart();
 				if(_GfxStart())
