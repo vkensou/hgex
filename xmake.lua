@@ -35,6 +35,7 @@ target("rendergraph")
     add_packages("cgpu")
     add_includedirs("src/rendergraph/include", {public = true})
     add_headerfiles("src/rendergraph/include/*.h")
+    add_headerfiles("src/rendergraph/src/*.h", {install = false})
     add_files("src/rendergraph/src/*.cpp")
 
 target("hgex")
