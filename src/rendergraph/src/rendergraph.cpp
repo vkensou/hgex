@@ -11,8 +11,7 @@ namespace HGEGraphics
 	}
 	RenderGraphHandle Recorder::declareTexture(RenderGraph& renderGraph, const char* name, uint16_t width, uint16_t height, ECGPUFormat format)
 	{
-		auto node = renderGraph.allocator.new_object<ResourceNode>(name, width, height, format);
-		renderGraph.resources.emplace_back(node, renderGraph.allocator);
+		renderGraph.resources.emplace_back(name, width, height, format);
 		return RenderGraphHandle(renderGraph.resources.size() - 1);
 	}
 	RenderGraphHandle Recorder::declareColorTexture(RenderGraph& renderGraph, const char* name, uint16_t width, uint16_t height, ECGPUFormat format)
@@ -45,11 +44,15 @@ namespace HGEGraphics
 		else
 			return RenderGraphHandle();
 	}
-	RenderGraphHandle Recorder::importTexture(RenderGraph& renderGraph, const char* name, CGPUTextureView texture)
+	RenderGraphHandle Recorder::importTexture(RenderGraph& renderGraph, const char* name, CGPUTextureViewId texture)
 	{
-		auto node = renderGraph.allocator.new_object<ResourceNode>(name, texture, texture.info.texture->info->width, texture.info.texture->info->height, texture.info.texture->info->format);
-		renderGraph.resources.emplace_back(node, renderGraph.allocator);
+		renderGraph.resources.emplace_back(name, texture, (uint16_t)texture->info.texture->info->width, (uint16_t)texture->info.texture->info->height, texture->info.texture->info->format);
 		return RenderGraphHandle(renderGraph.resources.size() - 1);
+	}
+	PassBuilder Recorder::addPass(RenderGraph& renderGraph, const char* name)
+	{
+		renderGraph.passes.emplace_back(name, renderGraph.allocator);
+		return PassBuilder(renderGraph, renderGraph.passes.back());
 	}
 	ResourceNode::ResourceNode(const char* name, uint16_t width, uint16_t height, ECGPUFormat format)
 		: type(RenderGraphResourceType::Managed), width(width), height(height), format (format), texture(CGPU_NULL)
@@ -58,5 +61,17 @@ namespace HGEGraphics
 	ResourceNode::ResourceNode(const char* name, CGPUTextureViewId texture, uint16_t width, uint16_t height, ECGPUFormat format)
 		: type(RenderGraphResourceType::Managed), width(width), height(height), format(format), texture(texture)
 	{
+	}
+	PassBuilder::PassBuilder(RenderGraph& renderGraph, PassNode& passNode)
+		: renderGraph(renderGraph), passNode(passNode)
+	{
+	}
+	PassNode::PassNode(const char* name, std::pmr::polymorphic_allocator<std::byte>& allocator)
+		: name(name), writes(allocator), reads(allocator)
+	{
+	}
+	PassBuilder& PassBuilder::addColorAttachment(RenderGraphHandle texture)
+	{
+		return *this;
 	}
 }
