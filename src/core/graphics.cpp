@@ -87,11 +87,16 @@ void hge_graphicsfree_aligned(void *user_data, void *ptr, size_t alignment, cons
 
 void CALL HGE_Impl::Gfx_Clear(DWORD color)
 {
+	using namespace HGEGraphics;
+
 	if (prepared)
 		return;
 
 	auto &cur_frame_data = frame_datas[current_frame_index];
 	auto &cur_swapchain_info = swapchain_infos[current_swapchain_index];
+
+	auto passBuilder = Recorder::addPass(rg, "Render Pass");
+	RenderPassBuilder::addColorAttachment(passBuilder, rg_cur_texture, ECGPULoadAction::CGPU_LOAD_ACTION_CLEAR, color, ECGPUStoreAction::CGPU_STORE_ACTION_STORE);
 
 	const CGPUClearValue clearColor = {
 		.color = {GETR(color) / 255.0f, GETG(color) / 255.0f, GETB(color) / 255.0f, 1},
@@ -148,6 +153,9 @@ bool CALL HGE_Impl::Gfx_BeginScene(HTARGET targ)
 	auto back_buffer = cur_swapchain_info.texture;
 	auto back_buffer_view = cur_swapchain_info.texture_view;
 	auto prepared_semaphore = cur_frame_data.prepared_semaphore;
+
+	if (targ == 0)
+		rg_cur_texture = rg_swapchain_texture;
 
 	cur_cmd = _RequestCmd(cur_frame_data);
 	cgpu_cmd_begin(cur_cmd);
@@ -1015,6 +1023,8 @@ void HGE_Impl::_GfxDone()
 
 bool HGE_Impl::_GfxStart()
 {
+	using namespace HGEGraphics;
+
 	auto& cur_frame_data = frame_datas[current_frame_index];
 	cgpu_wait_fences(&cur_frame_data.inflight_fence, 1);
 
@@ -1030,6 +1040,9 @@ bool HGE_Impl::_GfxStart()
 	VertArray = (hgeVertex*)cur_vertex_buffer->pVB->info->cpu_mapped_address;
 	cur_vertex_buffer->ib_eaten = 0;
 	cur_vertex_buffer->vb_eaten = 0;
+	Recorder::reset(rg);
+	rg_swapchain_texture = RenderGraphHandle();
+	rg_cur_texture = RenderGraphHandle();
 
 	cgpu_reset_command_pool(cur_frame_data.pool);
 
@@ -1045,6 +1058,10 @@ bool HGE_Impl::_GfxStart()
 	if (current_swapchain_index == -1)
 		return false;
 
+	auto& cur_swapchain_info = swapchain_infos[current_swapchain_index];
+
+	rg_swapchain_texture = Recorder::importTexture(rg, "Swapchain", cur_swapchain_info.texture_view);
+
 	rendering = true;
 
 	return true;
@@ -1052,7 +1069,11 @@ bool HGE_Impl::_GfxStart()
 
 void HGE_Impl::_GfxEnd()
 {
+	using namespace HGEGraphics;
+
 	rendering = false;
+
+	Recorder::present(rg, rg_swapchain_texture);
 
 	auto& cur_frame_data = frame_datas[current_frame_index];
 	auto prepared_semaphore = cur_frame_data.prepared_semaphore;

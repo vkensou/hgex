@@ -65,7 +65,7 @@ namespace HGEGraphics
 	struct ResourceNode
 	{
 		ResourceNode(const char* name, uint16_t width, uint16_t height, ECGPUFormat format);
-		ResourceNode(const char* name, CGPUTextureViewId texture, uint16_t width, uint16_t height, ECGPUFormat format);
+		ResourceNode(const char* name, CGPUTextureViewId texture);
 
 		const RenderGraphResourceType type;
 		const CGPUTextureViewId texture;
@@ -85,10 +85,10 @@ namespace HGEGraphics
 	{
 		RenderPassNode(const char* name, std::pmr::polymorphic_allocator<std::byte>& allocator);
 
-		const char* name;
+		const char* name{ nullptr };
 		std::pmr::vector<uint32_t> writes;
 		std::pmr::vector<uint32_t> reads;
-		int colorAttachmentCount;
+		int colorAttachmentCount{ 0 };
 		std::array<ColorAttachmentInfo, 8> colorAttachments;
 		DepthAttachmentInfo depthAttachment;
 	};
@@ -111,8 +111,8 @@ namespace HGEGraphics
 	{
 		RenderPassBuilder(class RenderGraph& renderGraph, RenderPassNode& passNode, int passIndex);
 
-		static void addColorAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction load_action, ECGPUStoreAction store_action, uint32_t clearColor);
-		static void addDepthAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction depth_load_action, ECGPUStoreAction depth_store_action, float clearDepth, ECGPULoadAction stencil_load_action, ECGPUStoreAction stencil_store_action, uint8_t clearStencil);
+		static void addColorAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction load_action, uint32_t clearColor, ECGPUStoreAction store_action);
+		static void addDepthAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction depth_load_action, float clearDepth, ECGPUStoreAction depth_store_action, ECGPULoadAction stencil_load_action, uint8_t clearStencil, ECGPUStoreAction stencil_store_action);
 		static void sample(RenderPassBuilder& passBuilder, RenderGraphHandle texture);
 
 	private:
@@ -141,6 +141,7 @@ namespace HGEGraphics
 
 	struct Recorder
 	{
+		static void reset(RenderGraph& renderGraph);
 		static RenderGraphHandle declareTexture(RenderGraph& renderGraph, const char* name, uint16_t width, uint16_t height, ECGPUFormat format);
 		static RenderGraphHandle declareColorTexture(RenderGraph& renderGraph, const char* name, uint16_t width, uint16_t height, ECGPUFormat format);
 		static RenderGraphHandle declareDepthTexture(RenderGraph& renderGraph, const char* name, uint16_t width, uint16_t height, DepthBits depthBits, bool needStencil);

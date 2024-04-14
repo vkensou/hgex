@@ -11,6 +11,12 @@ namespace HGEGraphics
 		passes.reserve(estimate_pass_count);
 		edges.reserve(estimate_edge_count);
 	}
+	void Recorder::reset(RenderGraph& renderGraph)
+	{
+		renderGraph.resources.clear();
+		renderGraph.passes.clear();
+		renderGraph.edges.clear();
+	}
 	RenderGraphHandle Recorder::declareTexture(RenderGraph& renderGraph, const char* name, uint16_t width, uint16_t height, ECGPUFormat format)
 	{
 		renderGraph.resources.emplace_back(name, width, height, format);
@@ -48,7 +54,7 @@ namespace HGEGraphics
 	}
 	RenderGraphHandle Recorder::importTexture(RenderGraph& renderGraph, const char* name, CGPUTextureViewId texture)
 	{
-		renderGraph.resources.emplace_back(name, texture, (uint16_t)texture->info.texture->info->width, (uint16_t)texture->info.texture->info->height, texture->info.texture->info->format);
+		renderGraph.resources.emplace_back(name, texture);
 		return RenderGraphHandle(renderGraph.resources.size() - 1);
 	}
 	RenderPassBuilder Recorder::addPass(RenderGraph& renderGraph, const char* name)
@@ -72,8 +78,8 @@ namespace HGEGraphics
 		: type(RenderGraphResourceType::Managed), width(width), height(height), format (format), texture(CGPU_NULL)
 	{
 	}
-	ResourceNode::ResourceNode(const char* name, CGPUTextureViewId texture, uint16_t width, uint16_t height, ECGPUFormat format)
-		: type(RenderGraphResourceType::Managed), width(width), height(height), format(format), texture(texture)
+	ResourceNode::ResourceNode(const char* name, CGPUTextureViewId texture)
+		: type(RenderGraphResourceType::Imported), texture(texture), width(texture->info.texture->info->width), height(texture->info.texture->info->height), format(texture->info.texture->info->format)
 	{
 	}
 	RenderPassBuilder::RenderPassBuilder(RenderGraph& renderGraph, RenderPassNode& passNode, int passIndex)
@@ -84,7 +90,7 @@ namespace HGEGraphics
 		: name(name), writes(allocator), reads(allocator)
 	{
 	}
-	void RenderPassBuilder::addColorAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction load_action, ECGPUStoreAction store_action, uint32_t clearColor)
+	void RenderPassBuilder::addColorAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction load_action, uint32_t clearColor, ECGPUStoreAction store_action)
 	{
 		assert(passBuilder.passNode.colorAttachmentCount <= passBuilder.passNode.colorAttachments.size());
 
@@ -99,7 +105,7 @@ namespace HGEGraphics
 			.valid = true,
 		};
 	}
-	void RenderPassBuilder::addDepthAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction depth_load_action, ECGPUStoreAction depth_store_action, float clearDepth, ECGPULoadAction stencil_load_action, ECGPUStoreAction stencil_store_action, uint8_t clearStencil)
+	void RenderPassBuilder::addDepthAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction depth_load_action, float clearDepth, ECGPUStoreAction depth_store_action, ECGPULoadAction stencil_load_action, uint8_t clearStencil, ECGPUStoreAction stencil_store_action)
 	{
 		assert(!passBuilder.passNode.depthAttachment.valid);
 

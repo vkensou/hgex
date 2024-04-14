@@ -18,6 +18,8 @@
 #include "glm/mat4x4.hpp"
 #include "renderdoc.h"
 #include "utils/JobSystem.h"
+#include "rendergraph.h"
+#include <memory_resource>
 
 #define DEMO
 
@@ -348,6 +350,10 @@ public:
 	std::vector<CTextureList*> deleted_textures;
 	CGPUBufferId per_frame_ubo;
 	CGPUDescriptorSetId per_frame_ubo_descriptor_sets[2];
+	std::pmr::unsynchronized_pool_resource rg_pool;
+	HGEGraphics::RenderGraph rg{ 1, 1, 1, &rg_pool };
+	HGEGraphics::RenderGraphHandle rg_swapchain_texture;
+	HGEGraphics::RenderGraphHandle rg_cur_texture;
 
 	glm::mat4			matView;
 	glm::mat4			matProj;
