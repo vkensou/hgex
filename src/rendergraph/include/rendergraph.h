@@ -56,9 +56,9 @@ namespace HGEGraphics
 		const TextureUsage usage;
 	};
 
-	struct PassNode
+	struct RenderPassNode
 	{
-		PassNode(const char* name, std::pmr::polymorphic_allocator<std::byte>& allocator);
+		RenderPassNode(const char* name, std::pmr::polymorphic_allocator<std::byte>& allocator);
 
 		const char* name;
 		std::pmr::vector<uint32_t> writes;
@@ -79,15 +79,15 @@ namespace HGEGraphics
 		std::optional<uint16_t> m_index;
 	};
 
-	struct PassBuilder
+	struct RenderPassBuilder
 	{
-		PassBuilder(class RenderGraph& renderGraph, PassNode& passNode);
+		RenderPassBuilder(class RenderGraph& renderGraph, RenderPassNode& passNode);
 
-		PassBuilder& addColorAttachment(RenderGraphHandle texture);
+		static void addColorAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture);
 
 	private:
 		RenderGraph& renderGraph;
-		PassNode& passNode;
+		RenderPassNode& passNode;
 	};
 
 	struct RenderGraph
@@ -96,7 +96,7 @@ namespace HGEGraphics
 
 		RenderGraph(size_t estimate_resource_count, size_t estimate_pass_count, size_t estimate_edge_count, std::pmr::memory_resource* const resource);
 		std::pmr::vector<ResourceNode> resources;
-		std::pmr::vector<PassNode> passes;
+		std::pmr::vector<RenderPassNode> passes;
 		std::pmr::vector<RenderGraphEdge> edges;
 		allocator_type allocator;
 	};
@@ -114,7 +114,7 @@ namespace HGEGraphics
 		static RenderGraphHandle declareColorTexture(RenderGraph& renderGraph, const char* name, uint16_t width, uint16_t height, ECGPUFormat format);
 		static RenderGraphHandle declareDepthTexture(RenderGraph& renderGraph, const char* name, uint16_t width, uint16_t height, DepthBits depthBits, bool needStencil);
 		static RenderGraphHandle importTexture(RenderGraph& renderGraph, const char* name, CGPUTextureViewId texture);
-		static PassBuilder addPass(RenderGraph& renderGraph, const char* name);
+		static RenderPassBuilder addPass(RenderGraph& renderGraph, const char* name);
 		static uint32_t addEdge(RenderGraph& renderGraph, uint32_t from, uint32_t to, TextureUsage usage);
 		static void present(RenderGraph& renderGraph, int texture);
 	};
