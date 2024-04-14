@@ -1,5 +1,7 @@
 #include "rendergraph.h"
 
+#include <cassert>
+
 namespace HGEGraphics
 {
 	RenderGraph::RenderGraph(size_t estimate_resource_count, size_t estimate_pass_count, size_t estimate_edge_count, std::pmr::memory_resource* const resource)
@@ -52,7 +54,19 @@ namespace HGEGraphics
 	RenderPassBuilder Recorder::addPass(RenderGraph& renderGraph, const char* name)
 	{
 		renderGraph.passes.emplace_back(name, renderGraph.allocator);
-		return RenderPassBuilder(renderGraph, renderGraph.passes.back());
+		return RenderPassBuilder(renderGraph, renderGraph.passes.back(), renderGraph.passes.size() - 1);
+	}
+	uint32_t Recorder::addEdge(RenderGraph& renderGraph, uint32_t from, uint32_t to, TextureUsage usage)
+	{
+		renderGraph.edges.emplace_back(from, to, usage);
+		return renderGraph.edges.size() - 1;
+	}
+	void Recorder::present(RenderGraph& renderGraph, RenderGraphHandle texture)
+	{
+		auto& passNode = renderGraph.passes.emplace_back("Present", renderGraph.allocator);
+		int passIndex = renderGraph.passes.size() - 1;
+		auto edge = Recorder::addEdge(renderGraph, texture.index().value(), passIndex, TextureUsage::Present);
+		passNode.reads.push_back(edge);
 	}
 	ResourceNode::ResourceNode(const char* name, uint16_t width, uint16_t height, ECGPUFormat format)
 		: type(RenderGraphResourceType::Managed), width(width), height(height), format (format), texture(CGPU_NULL)
@@ -62,16 +76,50 @@ namespace HGEGraphics
 		: type(RenderGraphResourceType::Managed), width(width), height(height), format(format), texture(texture)
 	{
 	}
-	RenderPassBuilder::RenderPassBuilder(RenderGraph& renderGraph, RenderPassNode& passNode)
-		: renderGraph(renderGraph), passNode(passNode)
+	RenderPassBuilder::RenderPassBuilder(RenderGraph& renderGraph, RenderPassNode& passNode, int passIndex)
+		: renderGraph(renderGraph), passNode(passNode), passIndex(passIndex)
 	{
 	}
 	RenderPassNode::RenderPassNode(const char* name, std::pmr::polymorphic_allocator<std::byte>& allocator)
 		: name(name), writes(allocator), reads(allocator)
 	{
 	}
-	void RenderPassBuilder::addColorAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture)
+	void RenderPassBuilder::addColorAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction load_action, ECGPUStoreAction store_action, uint32_t clearColor)
 	{
-		return ;
+		assert(passBuilder.passNode.colorAttachmentCount <= passBuilder.passNode.colorAttachments.size());
+
+		auto edge = Recorder::addEdge(passBuilder.renderGraph, passBuilder.passIndex, texture.index().value(), TextureUsage::ColorAttachment);
+		passBuilder.passNode.writes.push_back(edge);
+		passBuilder.passNode.colorAttachments[passBuilder.passNode.colorAttachmentCount++] =
+		{
+			.clearColor = clearColor,
+			.resourceIndex = (int)passBuilder.passNode.writes.size() - 1,
+			.load_action = load_action,
+			.store_action = store_action,
+			.valid = true,
+		};
+	}
+	void RenderPassBuilder::addDepthAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction depth_load_action, ECGPUStoreAction depth_store_action, float clearDepth, ECGPULoadAction stencil_load_action, ECGPUStoreAction stencil_store_action, uint8_t clearStencil)
+	{
+		assert(!passBuilder.passNode.depthAttachment.valid);
+
+		auto edge = Recorder::addEdge(passBuilder.renderGraph, passBuilder.passIndex, texture.index().value(), TextureUsage::DepthAttachment);
+		passBuilder.passNode.writes.push_back(edge);
+		passBuilder.passNode.depthAttachment =
+		{
+			.clearDepth = clearDepth,
+			.clearStencil = clearStencil,
+			.resourceIndex = (int)passBuilder.passNode.writes.size() - 1,
+			.depth_load_action = depth_load_action,
+			.depth_store_action = depth_store_action,
+			.stencil_load_action = stencil_load_action,
+			.stencil_store_action = stencil_store_action,
+			.valid = true,
+		};
+	}
+	void RenderPassBuilder::sample(RenderPassBuilder& passBuilder, RenderGraphHandle texture)
+	{
+		auto edge = Recorder::addEdge(passBuilder.renderGraph, texture.index().value(), passBuilder.passIndex, TextureUsage::Sample);
+		passBuilder.passNode.reads.push_back(edge);
 	}
 }

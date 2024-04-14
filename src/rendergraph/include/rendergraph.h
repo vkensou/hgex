@@ -2,6 +2,7 @@
 
 #include "cgpu/api.h"
 #include <vector>
+#include <array>
 #include <memory>
 #include <optional>
 
@@ -24,7 +25,31 @@ namespace HGEGraphics
 		Present = 0x1000,
 	};
 
-	class polymorphic_allocator_delete {
+	struct alignas(8) ColorAttachmentInfo
+	{
+		unsigned int clearColor = 0;
+		int resourceIndex = 0;
+		ECGPULoadAction load_action = ECGPULoadAction::CGPU_LOAD_ACTION_DONTCARE;
+		ECGPUStoreAction store_action = ECGPUStoreAction::CGPU_STORE_ACTION_DISCARD;
+		bool valid = false;
+		bool operator==(const ColorAttachmentInfo& other) const;
+	};
+
+	struct alignas(8) DepthAttachmentInfo
+	{
+		float clearDepth = 0;
+		uint8_t clearStencil = 0;
+		int resourceIndex = 0;
+		ECGPULoadAction depth_load_action = ECGPULoadAction::CGPU_LOAD_ACTION_DONTCARE;
+		ECGPUStoreAction depth_store_action = ECGPUStoreAction::CGPU_STORE_ACTION_DISCARD;
+		ECGPULoadAction stencil_load_action = ECGPULoadAction::CGPU_LOAD_ACTION_DONTCARE;
+		ECGPUStoreAction stencil_store_action = ECGPUStoreAction::CGPU_STORE_ACTION_DISCARD;
+		bool valid = false;
+		bool operator==(const DepthAttachmentInfo& other) const;
+	};
+
+	class polymorphic_allocator_delete
+	{
 	public:
 		polymorphic_allocator_delete(std::pmr::polymorphic_allocator<std::byte>& allocator)
 			: d_allocator(allocator) {}
@@ -63,6 +88,9 @@ namespace HGEGraphics
 		const char* name;
 		std::pmr::vector<uint32_t> writes;
 		std::pmr::vector<uint32_t> reads;
+		int colorAttachmentCount;
+		std::array<ColorAttachmentInfo, 8> colorAttachments;
+		DepthAttachmentInfo depthAttachment;
 	};
 
 	class RenderGraphHandle
@@ -81,13 +109,16 @@ namespace HGEGraphics
 
 	struct RenderPassBuilder
 	{
-		RenderPassBuilder(class RenderGraph& renderGraph, RenderPassNode& passNode);
+		RenderPassBuilder(class RenderGraph& renderGraph, RenderPassNode& passNode, int passIndex);
 
-		static void addColorAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture);
+		static void addColorAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction load_action, ECGPUStoreAction store_action, uint32_t clearColor);
+		static void addDepthAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction depth_load_action, ECGPUStoreAction depth_store_action, float clearDepth, ECGPULoadAction stencil_load_action, ECGPUStoreAction stencil_store_action, uint8_t clearStencil);
+		static void sample(RenderPassBuilder& passBuilder, RenderGraphHandle texture);
 
 	private:
 		RenderGraph& renderGraph;
 		RenderPassNode& passNode;
+		int passIndex;
 	};
 
 	struct RenderGraph
@@ -116,7 +147,7 @@ namespace HGEGraphics
 		static RenderGraphHandle importTexture(RenderGraph& renderGraph, const char* name, CGPUTextureViewId texture);
 		static RenderPassBuilder addPass(RenderGraph& renderGraph, const char* name);
 		static uint32_t addEdge(RenderGraph& renderGraph, uint32_t from, uint32_t to, TextureUsage usage);
-		static void present(RenderGraph& renderGraph, int texture);
+		static void present(RenderGraph& renderGraph, RenderGraphHandle texture);
 	};
 
 	class Compiler
