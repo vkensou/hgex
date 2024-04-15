@@ -19,14 +19,15 @@
 #include <iterator>
 #include <algorithm>
 #include <cassert>
+#include <memory_resource>
 
-namespace crab {
+namespace HGEGraphics {
 
-DependencyGraph::DependencyGraph(const allocator_type& allocator) noexcept 
-    : mNodes(allocator), mEdges(allocator)
+DependencyGraph::DependencyGraph(size_t node_count, size_t edge_count, std::pmr::memory_resource* const resource) noexcept
+    : mNodes(resource), mEdges(resource)
 {
-    mNodes.reserve(8);
-    mEdges.reserve(16);
+    mNodes.reserve(node_count);
+    mEdges.reserve(edge_count);
 }
 
 DependencyGraph::~DependencyGraph() noexcept = default;
@@ -194,7 +195,8 @@ void DependencyGraph::export_graphviz(std::ostream& out, char const* name) {
 bool DependencyGraph::isAcyclic() const noexcept {
 #ifndef NDEBUG
     // We work on a copy of the graph
-    DependencyGraph graph(std::pmr::get_default_resource());
+    std::pmr::unsynchronized_pool_resource pool;
+    DependencyGraph graph(mNodes.size(), mEdges.size(), &pool);
     graph.mEdges = mEdges;
     graph.mNodes = mNodes;
     return DependencyGraph::isAcyclicInternal(graph);

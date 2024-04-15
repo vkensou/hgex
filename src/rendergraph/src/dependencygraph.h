@@ -21,7 +21,7 @@
 #include <ostream>
 #include <cassert>
 
-namespace crab {
+namespace HGEGraphics {
 
 /**
  * A very simple dependency graph (DAG) class that support culling of unused nodes
@@ -30,7 +30,7 @@ class DependencyGraph {
 public:
     using allocator_type = std::pmr::polymorphic_allocator<std::byte>;
 
-    DependencyGraph(const allocator_type& allocator) noexcept;
+    DependencyGraph(size_t node_count, size_t edge_count, std::pmr::memory_resource* const resource) noexcept;
     ~DependencyGraph() noexcept;
     DependencyGraph(const DependencyGraph&) noexcept = delete;
     DependencyGraph& operator=(const DependencyGraph&) noexcept = delete;

@@ -151,11 +151,6 @@ namespace HGEGraphics
 		static void present(RenderGraph& renderGraph, RenderGraphHandle texture);
 	};
 
-	class Compiler
-	{
-
-	};
-
 	class Executor
 	{
 

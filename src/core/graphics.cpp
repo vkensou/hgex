@@ -11,6 +11,7 @@
 #include "FreeImage.h"
 #include "glm/gtc/matrix_transform.hpp"
 #include <span>
+#include "rendergraph_compiler.h"
 
 void hge_graphicslog(void* user_data, ECGPULogSeverity severity, const char* fmt, ...)
 {
@@ -1074,6 +1075,8 @@ void HGE_Impl::_GfxEnd()
 	rendering = false;
 
 	Recorder::present(rg, rg_swapchain_texture);
+
+	auto compiled = Compiler::Compile(rg, &rg_pool);
 
 	auto& cur_frame_data = frame_datas[current_frame_index];
 	auto prepared_semaphore = cur_frame_data.prepared_semaphore;
