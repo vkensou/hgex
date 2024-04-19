@@ -76,8 +76,8 @@ namespace HGEGraphics
 
 	struct RenderGraphEdge
 	{
-		const uint32_t from;
-		const uint32_t to;
+		const uint16_t from;
+		const uint16_t to;
 		const TextureUsage usage;
 	};
 
@@ -88,6 +88,7 @@ namespace HGEGraphics
 		const char* name{ nullptr };
 		std::pmr::vector<uint32_t> writes;
 		std::pmr::vector<uint32_t> reads;
+		bool is_root{ false };
 		int colorAttachmentCount{ 0 };
 		std::array<ColorAttachmentInfo, 8> colorAttachments;
 		DepthAttachmentInfo depthAttachment;
@@ -118,7 +119,7 @@ namespace HGEGraphics
 	private:
 		RenderGraph& renderGraph;
 		RenderPassNode& passNode;
-		int passIndex;
+		uint16_t passIndex;
 	};
 
 	struct RenderGraph

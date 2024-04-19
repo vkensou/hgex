@@ -73,6 +73,7 @@ namespace HGEGraphics
 		int passIndex = renderGraph.passes.size() - 1;
 		auto edge = Recorder::addEdge(renderGraph, texture.index().value(), passIndex, TextureUsage::Present);
 		passNode.reads.push_back(edge);
+		passNode.is_root = true;
 	}
 	ResourceNode::ResourceNode(const char* name, uint16_t width, uint16_t height, ECGPUFormat format)
 		: type(RenderGraphResourceType::Managed), width(width), height(height), format (format), texture(CGPU_NULL)
