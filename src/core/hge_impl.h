@@ -20,6 +20,7 @@
 #include "utils/JobSystem.h"
 #include "rendergraph.h"
 #include <memory_resource>
+#include "texturepool.h"
 
 #define DEMO
 
@@ -89,8 +90,28 @@ struct PerSwapChainInfo
 	CGPUFramebufferId framebuffer;
 };
 
+class CgpuTexturePool
+	: public HGEGraphics::TexturePool
+{
+public:
+	CgpuTexturePool(CGPUDeviceId device, CGPUQueueId gfx_queue, TexturePool* upstream, std::pmr::memory_resource* const memory_resource);
+
+protected:
+	HGEGraphics::Texture* getResource_impl(const HGEGraphics::TextureDescriptor& descriptor) override;
+	void destroyResource_impl(HGEGraphics::Texture* resource) override;
+
+private:
+	CGPUDeviceId device;
+	CGPUQueueId gfx_queue;
+};
+
 struct PerFrameData
 {
+	PerFrameData(CGPUDeviceId device, CGPUQueueId gfx_queue, std::pmr::memory_resource* const memory_resource)
+		: texture_pool(device, gfx_queue, nullptr, memory_resource)
+	{
+	}
+
 	CGPUFenceId inflight_fence{ CGPU_NULLPTR };
 	CGPUSemaphoreId prepared_semaphore{ CGPU_NULLPTR };
 	CGPUCommandPoolId pool{ CGPU_NULLPTR };
@@ -98,6 +119,7 @@ struct PerFrameData
 	std::vector<CGPUCommandBufferId> allocated_cmds;
 	std::vector<CGPUDescriptorSetId> allocated_descriptor_sets;
 	CGPUDescriptorSetId last_descriptor_set{ CGPU_NULLPTR };
+	CgpuTexturePool texture_pool;
 };
 
 struct PerFrameUBOData

@@ -59,7 +59,7 @@ namespace HGEGraphics
 	}
 	RenderPassBuilder Recorder::addPass(RenderGraph& renderGraph, const char* name)
 	{
-		renderGraph.passes.emplace_back(name, renderGraph.allocator);
+		renderGraph.passes.emplace_back(name, renderGraph.allocator.resource());
 		return RenderPassBuilder(renderGraph, renderGraph.passes.back(), renderGraph.passes.size() - 1);
 	}
 	uint32_t Recorder::addEdge(RenderGraph& renderGraph, uint32_t from, uint32_t to, TextureUsage usage)
@@ -68,19 +68,19 @@ namespace HGEGraphics
 		return renderGraph.edges.size() - 1;
 	}
 	ResourceNode::ResourceNode(const char* name, uint16_t width, uint16_t height, ECGPUFormat format)
-		: type(RenderGraphResourceType::Managed), width(width), height(height), format (format), texture(CGPU_NULL), is_imported(false)
+		: name(name), type(RenderGraphResourceType::Managed), width(width), height(height), format (format), texture(CGPU_NULL)
 	{
 	}
 	ResourceNode::ResourceNode(const char* name, CGPUTextureViewId texture)
-		: type(RenderGraphResourceType::Imported), texture(texture), width(texture->info.texture->info->width), height(texture->info.texture->info->height), format(texture->info.texture->info->format), is_imported(true)
+		: name(name), type(RenderGraphResourceType::Backbuffer), texture(texture), width(texture->info.texture->info->width), height(texture->info.texture->info->height), format(texture->info.texture->info->format)
 	{
 	}
 	RenderPassBuilder::RenderPassBuilder(RenderGraph& renderGraph, RenderPassNode& passNode, int passIndex)
 		: renderGraph(renderGraph), passNode(passNode), passIndex(passIndex)
 	{
 	}
-	RenderPassNode::RenderPassNode(const char* name, std::pmr::polymorphic_allocator<std::byte>& allocator)
-		: name(name), writes(allocator), reads(allocator)
+	RenderPassNode::RenderPassNode(const char* name, std::pmr::memory_resource* const momory_resource)
+		: name(name), writes(momory_resource), reads(momory_resource)
 	{
 	}
 	void RenderPassBuilder::addColorAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction load_action, uint32_t clearColor, ECGPUStoreAction store_action)

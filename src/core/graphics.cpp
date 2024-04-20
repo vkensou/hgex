@@ -12,6 +12,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include <span>
 #include "rendergraph_compiler.h"
+#include "rendergraph_executor.h"
 
 void hge_graphicslog(void* user_data, ECGPULogSeverity severity, const char* fmt, ...)
 {
@@ -769,7 +770,7 @@ bool HGE_Impl::_GfxInit()
 	frame_datas.clear();
 	for (size_t i = 0; i < swapchain->buffer_count; ++i)
 	{
-		PerFrameData frame_data;
+		PerFrameData frame_data(device, gfx_queue, &rg_pool);
 		frame_data.inflight_fence = cgpu_create_fence(device);
 		frame_data.prepared_semaphore = cgpu_create_semaphore(device);
 		frame_data.pool = cgpu_create_command_pool(gfx_queue, CGPU_NULLPTR);
@@ -1074,9 +1075,11 @@ void HGE_Impl::_GfxEnd()
 
 	rendering = false;
 
-	auto compiled = Compiler::Compile(rg, &rg_pool);
-
 	auto& cur_frame_data = frame_datas[current_frame_index];
+
+	auto compiled = Compiler::Compile(rg, &rg_pool);
+	Executor::Execute(compiled, cur_frame_data.texture_pool);
+
 	auto prepared_semaphore = cur_frame_data.prepared_semaphore;
 	CGPUQueueSubmitDescriptor submit_desc = {
 		.cmds = cur_frame_data.allocated_cmds.data(),
@@ -1345,4 +1348,50 @@ void HGE_Impl::_FreeDeletedTextures()
 		delete texItem;
 	}
 	deleted_textures.clear();
+}
+
+CgpuTexturePool::CgpuTexturePool(CGPUDeviceId device, CGPUQueueId gfx_queue, TexturePool* upstream, std::pmr::memory_resource* const memory_resource)
+	: TexturePool(upstream, memory_resource), device(device), gfx_queue(gfx_queue)
+{
+}
+
+HGEGraphics::Texture* CgpuTexturePool::getResource_impl(const HGEGraphics::TextureDescriptor& descriptor)
+{
+	CGPUTextureDescriptor texture_desc =
+	{
+		.flags = CGPU_TCF_FORCE_2D,
+		.width = descriptor.width,
+		.height = descriptor.height,
+		.depth = 1,
+		.array_size = 1,
+		.format = CGPU_FORMAT_R8G8B8A8_UNORM,
+		.mip_levels = 1,
+		.owner_queue = gfx_queue,
+		.start_state = CGPU_RESOURCE_STATE_UNDEFINED,
+		.descriptors = CGPU_RESOURCE_TYPE_TEXTURE,
+	};
+
+	auto texture = cgpu_create_texture(device, &texture_desc);
+
+	CGPUTextureViewDescriptor view_desc = {
+		.texture = texture,
+		.format = texture->info->format,
+		.usages = CGPU_TVU_SRV,
+		.aspects = CGPU_TVA_COLOR,
+	};
+	auto texture_view = cgpu_create_texture_view(device, &view_desc);
+
+	HGEGraphics::Texture* resource = new HGEGraphics::Texture();
+	resource->texture = texture;
+	resource->texture_view = texture_view;
+
+	return resource;
+}
+
+void CgpuTexturePool::destroyResource_impl(HGEGraphics::Texture* resource)
+{
+	cgpu_free_texture_view(resource->texture_view);
+	cgpu_free_texture(resource->texture);
+	resource->texture = CGPU_NULLPTR;
+	resource->texture_view = CGPU_NULLPTR;
 }

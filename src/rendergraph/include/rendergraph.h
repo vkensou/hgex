@@ -5,6 +5,7 @@
 #include <array>
 #include <memory>
 #include <optional>
+#include "texturepool.h"
 
 namespace HGEGraphics
 {
@@ -13,16 +14,6 @@ namespace HGEGraphics
 		Managed,
 		Imported,
 		Backbuffer,
-	};
-
-	enum class TextureUsage : uint16_t
-	{
-		None = 0b0000,
-		Sample = 0x0004,
-		ColorAttachment = 0x0010,
-		DepthAttachment = 0x0020,
-		InputAttachment = 0x0080,
-		Present = 0x1000,
 	};
 
 	struct alignas(8) ColorAttachmentInfo
@@ -67,12 +58,12 @@ namespace HGEGraphics
 		ResourceNode(const char* name, uint16_t width, uint16_t height, ECGPUFormat format);
 		ResourceNode(const char* name, CGPUTextureViewId texture);
 
+		const char* name;
 		const RenderGraphResourceType type;
 		const CGPUTextureViewId texture;
 		const uint16_t width;
 		const uint16_t height;
 		const ECGPUFormat format;
-		const bool is_imported;
 	};
 
 	struct RenderGraphEdge
@@ -84,7 +75,7 @@ namespace HGEGraphics
 
 	struct RenderPassNode
 	{
-		RenderPassNode(const char* name, std::pmr::polymorphic_allocator<std::byte>& allocator);
+		RenderPassNode(const char* name, std::pmr::memory_resource* const momory_resource);
 
 		const char* name{ nullptr };
 		std::pmr::vector<uint32_t> writes;
@@ -149,10 +140,5 @@ namespace HGEGraphics
 		static RenderGraphHandle importTexture(RenderGraph& renderGraph, const char* name, CGPUTextureViewId texture);
 		static RenderPassBuilder addPass(RenderGraph& renderGraph, const char* name);
 		static uint32_t addEdge(RenderGraph& renderGraph, uint32_t from, uint32_t to, TextureUsage usage);
-	};
-
-	class Executor
-	{
-
 	};
 }

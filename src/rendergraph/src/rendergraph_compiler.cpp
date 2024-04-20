@@ -2,6 +2,7 @@
 
 #include "dependencygraph.h"
 #include <cassert>
+#include <algorithm>
 
 namespace HGEGraphics
 {
@@ -51,7 +52,7 @@ namespace HGEGraphics
 		for (uint16_t i = 0; i < resourceCount; ++i)
 		{
 			auto const& resource = renderGraph.resources[i];
-			Node node(i, false, resource.is_imported, memory_resource);
+			Node node(i, false, resource.type != RenderGraphResourceType::Managed, memory_resource);
 			nodes.emplace_back(std::move(node));
 		}
 
@@ -102,6 +103,71 @@ namespace HGEGraphics
 			}
 		}
 
-		return CompiledRenderGraph();
+		CompiledRenderGraph compiled(memory_resource);
+		auto usedPassCount = std::count_if(nodes.begin(), nodes.begin() + passCount, [](auto& node) {return !node.is_culled(); });
+		auto usedResourceCount = std::count_if(nodes.begin() + passCount, nodes.end(), [](auto& node) {return !node.is_culled(); });
+		compiled.passes.reserve(usedPassCount);
+		for (auto i = 0; i < passCount; ++i)
+		{
+			auto const& node = nodes[i];
+			auto const& pass = renderGraph.passes[node.index];
+			if (node.is_culled())
+				continue;
+
+			auto& compiledPass = compiled.passes.emplace_back(pass.name, memory_resource);
+			compiledPass.reads.reserve(node.ins.size());
+			compiledPass.writes.reserve(node.outs.size());
+			compiledPass.colorAttachmentCount = pass.colorAttachmentCount;
+			for (auto j = 0; j < pass.colorAttachmentCount; ++j)
+			{
+				compiledPass.colorAttachments[j] = pass.colorAttachments[j];
+			}
+			compiledPass.depthAttachment = pass.depthAttachment;
+		}
+
+		compiled.resources.reserve(usedResourceCount);
+		for (auto i = 0; i < resourceCount; ++i)
+		{
+			auto const& node = nodes[i + passCount];
+			auto const& resource = renderGraph.resources[node.index];
+			if (node.is_culled())
+				continue;
+
+			auto& compiledResource = compiled.resources.emplace_back(resource.name, resource.type, resource.width, resource.height, resource.format, resource.texture);
+			if (resource.type == RenderGraphResourceType::Managed)
+			{
+				auto first = UINT16_MAX;
+				uint16_t last = 0;
+				if (!node.ins.empty())
+				{
+					first = std::min(first, node.ins.front());
+					last = std::max(last, node.ins.back());
+				}
+				if (!node.outs.empty())
+				{
+					first = std::min(first, node.outs.front());
+					last = std::max(last, node.outs.back());
+				}
+
+				assert(first >= 0 && first < compiled.passes.size());
+				compiled.passes[first].devirtualize.push_back(i);
+				assert(last >= 0 && last < compiled.passes.size());
+				compiled.passes[last].destroy.push_back(i);
+			}
+		}
+
+		return compiled;
+	}
+	CompiledResourceNode::CompiledResourceNode(const char* name, RenderGraphResourceType type, uint16_t width, uint16_t height, ECGPUFormat format, CGPUTextureViewId imported_texture_view)
+		: name(name), type(type), width(width), height(height), format(format), imported_texture_view(imported_texture_view), usage(TextureUsage::None), managered_texture(nullptr)
+	{
+	}
+	CompiledRenderPassNode::CompiledRenderPassNode(const char* name, std::pmr::memory_resource* const memory_resource)
+		: name(name), reads(memory_resource), writes(memory_resource)
+	{
+	}
+	CompiledRenderGraph::CompiledRenderGraph(std::pmr::memory_resource* const memory_resource)
+		: passes(memory_resource), resources(memory_resource)
+	{
 	}
 }
