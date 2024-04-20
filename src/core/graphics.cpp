@@ -1074,8 +1074,6 @@ void HGE_Impl::_GfxEnd()
 
 	rendering = false;
 
-	Recorder::present(rg, rg_swapchain_texture);
-
 	auto compiled = Compiler::Compile(rg, &rg_pool);
 
 	auto& cur_frame_data = frame_datas[current_frame_index];

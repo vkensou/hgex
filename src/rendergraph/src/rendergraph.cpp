@@ -67,20 +67,12 @@ namespace HGEGraphics
 		renderGraph.edges.emplace_back(from, to, usage);
 		return renderGraph.edges.size() - 1;
 	}
-	void Recorder::present(RenderGraph& renderGraph, RenderGraphHandle texture)
-	{
-		auto& passNode = renderGraph.passes.emplace_back("Present", renderGraph.allocator);
-		int passIndex = renderGraph.passes.size() - 1;
-		auto edge = Recorder::addEdge(renderGraph, texture.index().value(), passIndex, TextureUsage::Present);
-		passNode.reads.push_back(edge);
-		passNode.is_root = true;
-	}
 	ResourceNode::ResourceNode(const char* name, uint16_t width, uint16_t height, ECGPUFormat format)
-		: type(RenderGraphResourceType::Managed), width(width), height(height), format (format), texture(CGPU_NULL)
+		: type(RenderGraphResourceType::Managed), width(width), height(height), format (format), texture(CGPU_NULL), is_imported(false)
 	{
 	}
 	ResourceNode::ResourceNode(const char* name, CGPUTextureViewId texture)
-		: type(RenderGraphResourceType::Imported), texture(texture), width(texture->info.texture->info->width), height(texture->info.texture->info->height), format(texture->info.texture->info->format)
+		: type(RenderGraphResourceType::Imported), texture(texture), width(texture->info.texture->info->width), height(texture->info.texture->info->height), format(texture->info.texture->info->format), is_imported(true)
 	{
 	}
 	RenderPassBuilder::RenderPassBuilder(RenderGraph& renderGraph, RenderPassNode& passNode, int passIndex)

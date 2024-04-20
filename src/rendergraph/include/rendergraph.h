@@ -72,6 +72,7 @@ namespace HGEGraphics
 		const uint16_t width;
 		const uint16_t height;
 		const ECGPUFormat format;
+		const bool is_imported;
 	};
 
 	struct RenderGraphEdge
@@ -88,7 +89,6 @@ namespace HGEGraphics
 		const char* name{ nullptr };
 		std::pmr::vector<uint32_t> writes;
 		std::pmr::vector<uint32_t> reads;
-		bool is_root{ false };
 		int colorAttachmentCount{ 0 };
 		std::array<ColorAttachmentInfo, 8> colorAttachments;
 		DepthAttachmentInfo depthAttachment;
@@ -149,7 +149,6 @@ namespace HGEGraphics
 		static RenderGraphHandle importTexture(RenderGraph& renderGraph, const char* name, CGPUTextureViewId texture);
 		static RenderPassBuilder addPass(RenderGraph& renderGraph, const char* name);
 		static uint32_t addEdge(RenderGraph& renderGraph, uint32_t from, uint32_t to, TextureUsage usage);
-		static void present(RenderGraph& renderGraph, RenderGraphHandle texture);
 	};
 
 	class Executor
