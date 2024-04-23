@@ -30,6 +30,7 @@ namespace HGEGraphics
 		int colorAttachmentCount{ 0 };
 		std::array<ColorAttachmentInfo, 8> colorAttachments;
 		DepthAttachmentInfo depthAttachment;
+		std::function<void()> executable;
 	};
 
 	struct CompiledRenderGraph

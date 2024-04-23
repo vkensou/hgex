@@ -43,8 +43,13 @@ namespace HGEGraphics
 {
 	struct Texture
 	{
+		TextureDescriptor descriptor() const
+		{
+			return _descriptor;
+		}
 		CGPUTextureId texture;
 		CGPUTextureViewId texture_view;
+		TextureDescriptor _descriptor;
 	};
 
 	class TexturePool

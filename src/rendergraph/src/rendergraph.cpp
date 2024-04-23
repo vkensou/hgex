@@ -121,4 +121,8 @@ namespace HGEGraphics
 		auto edge = Recorder::addEdge(passBuilder.renderGraph, texture.index().value(), passBuilder.passIndex, TextureUsage::Sample);
 		passBuilder.passNode.reads.push_back(edge);
 	}
+	void RenderPassBuilder::setExecutable(RenderPassBuilder& passBuilder, std::function<void()>&& executable)
+	{
+		passBuilder.passNode.executable = executable;
+	}
 }

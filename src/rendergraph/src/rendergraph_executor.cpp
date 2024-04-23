@@ -17,7 +17,8 @@ namespace HGEGraphics
 				}
 			}
 
-			//pass->record(m_renderSystem, subflow);
+			if (pass.executable)
+				pass.executable();
 
 			for (auto resourceIndex : pass.destroy)
 			{

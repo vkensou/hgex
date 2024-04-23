@@ -1382,6 +1382,7 @@ HGEGraphics::Texture* CgpuTexturePool::getResource_impl(const HGEGraphics::Textu
 	auto texture_view = cgpu_create_texture_view(device, &view_desc);
 
 	HGEGraphics::Texture* resource = new HGEGraphics::Texture();
+	resource->_descriptor = descriptor;
 	resource->texture = texture;
 	resource->texture_view = texture_view;
 
