@@ -172,6 +172,33 @@ bool CALL HGE_Impl::Gfx_BeginScene(HTARGET targ)
 	return true;
 }
 
+bool CALL HGE_Impl::Gfx_BeginScene(DWORD color, RenderCallback renderCallback, void* userdata, HTARGET targ)
+{
+	if (prepared)
+		return false;
+
+	auto& cur_frame_data = frame_datas[current_frame_index];
+	auto& cur_swapchain_info = swapchain_infos[current_swapchain_index];
+
+	auto back_buffer = cur_swapchain_info.texture;
+	auto back_buffer_view = cur_swapchain_info.texture_view;
+	auto prepared_semaphore = cur_frame_data.prepared_semaphore;
+
+	using namespace HGEGraphics;
+
+	RenderGraphHandle the_texture;
+	if (targ == 0)
+		the_texture = Recorder::importTexture(rg, "Swapchain", cur_swapchain_info.texture_view);
+
+	auto passBuilder = Recorder::addPass(rg, "Render Pass");
+	RenderPassBuilder::addColorAttachment(passBuilder, the_texture, ECGPULoadAction::CGPU_LOAD_ACTION_CLEAR, color, ECGPUStoreAction::CGPU_STORE_ACTION_STORE);
+	RenderPassBuilder::setExecutable(passBuilder, renderCallback, userdata);
+
+	prepared = true;
+
+	return true;
+}
+
 void CALL HGE_Impl::Gfx_EndScene()
 {
 	auto &cur_frame_data = frame_datas[current_frame_index];

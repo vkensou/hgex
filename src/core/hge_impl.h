@@ -253,6 +253,7 @@ public:
 	virtual bool		CALL	Input_GetEvent(hgeInputEvent *event);
 
 	virtual bool		CALL	Gfx_BeginScene(HTARGET target=0);
+	virtual bool		CALL	Gfx_BeginScene(DWORD color, RenderCallback renderCallback, void* userdata, HTARGET target);
 	virtual void		CALL	Gfx_EndScene();
 	virtual void		CALL	Gfx_Clear(DWORD color);
 	virtual void		CALL	Gfx_RenderLine(float x1, float y1, float x2, float y2, DWORD color=0xFFFFFFFF, float z=0.5f);

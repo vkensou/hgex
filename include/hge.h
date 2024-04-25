@@ -201,6 +201,8 @@ struct hgeCallback
 	}
 };
 
+typedef void(*RenderCallback)(void* userdata);
+
 struct hgeJobPayload
 {
 	hgeJobPayload() = default;
@@ -432,6 +434,7 @@ public:
 	virtual bool		CALL	Input_GetEvent(hgeInputEvent *event) = 0;
 
 	virtual bool		CALL	Gfx_BeginScene(HTARGET target=0) = 0;
+	virtual bool		CALL	Gfx_BeginScene(DWORD color, RenderCallback renderCallback, void* userdata, HTARGET target=0) = 0;
 	virtual void		CALL	Gfx_EndScene() = 0;
 	virtual void		CALL	Gfx_Clear(DWORD color) = 0;
 	virtual void		CALL	Gfx_RenderLine(float x1, float y1, float x2, float y2, DWORD color=0xFFFFFFFF, float z=0.5f) = 0;

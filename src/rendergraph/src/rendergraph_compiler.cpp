@@ -123,7 +123,8 @@ namespace HGEGraphics
 				compiledPass.colorAttachments[j] = pass.colorAttachments[j];
 			}
 			compiledPass.depthAttachment = pass.depthAttachment;
-			compiledPass.executable = std::move(pass.executable);
+			compiledPass.executable = pass.executable;
+			compiledPass.userdata = pass.userdata;
 		}
 
 		compiled.resources.reserve(usedResourceCount);

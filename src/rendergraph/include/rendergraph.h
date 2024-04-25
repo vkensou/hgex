@@ -74,6 +74,8 @@ namespace HGEGraphics
 		const TextureUsage usage;
 	};
 
+	typedef void(*RenderPassExecutable)(void* userdata);
+
 	struct RenderPassNode
 	{
 		RenderPassNode(const char* name, std::pmr::memory_resource* const momory_resource);
@@ -84,7 +86,8 @@ namespace HGEGraphics
 		int colorAttachmentCount{ 0 };
 		std::array<ColorAttachmentInfo, 8> colorAttachments;
 		DepthAttachmentInfo depthAttachment;
-		std::function<void()> executable;
+		RenderPassExecutable executable;
+		void* userdata;
 	};
 
 	class RenderGraphHandle
@@ -108,7 +111,7 @@ namespace HGEGraphics
 		static void addColorAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction load_action, uint32_t clearColor, ECGPUStoreAction store_action);
 		static void addDepthAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction depth_load_action, float clearDepth, ECGPUStoreAction depth_store_action, ECGPULoadAction stencil_load_action, uint8_t clearStencil, ECGPUStoreAction stencil_store_action);
 		static void sample(RenderPassBuilder& passBuilder, RenderGraphHandle texture);
-		static void setExecutable(RenderPassBuilder& passBuilder, std::function<void()>&& executable);
+		static void setExecutable(RenderPassBuilder& passBuilder, RenderPassExecutable executable, void* userdata);
 
 	private:
 		RenderGraph& renderGraph;

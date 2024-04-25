@@ -33,6 +33,12 @@ float dx=0.0f, dy=0.0f;
 const float speed=90;
 const float friction=0.98f;
 
+struct RenderContext
+{
+	HGE* hge;
+	hgeQuad* quad;
+} renderContext;
+
 // This function plays collision sound with
 // parameters based on sprite position and speed
 void boom() {
@@ -80,17 +86,12 @@ bool RenderFunc(HGE* hge, void* userdata)
 	// Begin rendering quads.
 	// This function must be called
 	// before any actual rendering.
-	hge->Gfx_BeginScene();
+	hge->Gfx_BeginScene(0, [](void* userdata)
+		{
+			auto context = (RenderContext*)userdata;
 
-	// Clear screen with black color
-	hge->Gfx_Clear(0);
+		}, &renderContext);
 
-	// Render quads here. This time just
-	// one of them will serve our needs.
-	hge->Gfx_RenderQuad(&quad);
-
-	// End rendering and update the screen
-	hge->Gfx_EndScene();
 
 	// RenderFunc should always return false
 	return false;
@@ -147,6 +148,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		quad.v[1].tx=128.0/128.0; quad.v[1].ty=64.0/128.0; 
 		quad.v[2].tx=128.0/128.0; quad.v[2].ty=96.0/128.0; 
 		quad.v[3].tx=96.0/128.0; quad.v[3].ty=96.0/128.0; 
+
+		renderContext.hge = hge;
+		renderContext.quad = &quad;
 
 		// Let's rock now!
 		hge->System_Start();

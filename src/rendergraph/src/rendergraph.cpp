@@ -80,7 +80,7 @@ namespace HGEGraphics
 	{
 	}
 	RenderPassNode::RenderPassNode(const char* name, std::pmr::memory_resource* const momory_resource)
-		: name(name), writes(momory_resource), reads(momory_resource)
+		: name(name), writes(momory_resource), reads(momory_resource), executable(nullptr), userdata(nullptr)
 	{
 	}
 	void RenderPassBuilder::addColorAttachment(RenderPassBuilder& passBuilder, RenderGraphHandle texture, ECGPULoadAction load_action, uint32_t clearColor, ECGPUStoreAction store_action)
@@ -121,8 +121,9 @@ namespace HGEGraphics
 		auto edge = Recorder::addEdge(passBuilder.renderGraph, texture.index().value(), passBuilder.passIndex, TextureUsage::Sample);
 		passBuilder.passNode.reads.push_back(edge);
 	}
-	void RenderPassBuilder::setExecutable(RenderPassBuilder& passBuilder, std::function<void()>&& executable)
+	void RenderPassBuilder::setExecutable(RenderPassBuilder& passBuilder, RenderPassExecutable executable, void* userdata)
 	{
 		passBuilder.passNode.executable = executable;
+		passBuilder.passNode.userdata = userdata;
 	}
 }

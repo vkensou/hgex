@@ -18,7 +18,7 @@ namespace HGEGraphics
 			}
 
 			if (pass.executable)
-				pass.executable();
+				pass.executable(pass.userdata);
 
 			for (auto resourceIndex : pass.destroy)
 			{
